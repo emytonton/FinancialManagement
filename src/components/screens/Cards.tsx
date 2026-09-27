@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { capitalize, ddmm, fmt, monthName, monthShort, round2, sum, uid } from "@/lib/format";
 import { dueInvoices, futureCommitments, parcelInfo, thirdPartyFor, type ThirdParty } from "@/lib/finance";
 import { Badge, Button, CatIcon, Card, EmptyState, IconButton, Money, TransactionRow } from "../ui";
@@ -12,6 +13,9 @@ export function Cards() {
   const fut = futureCommitments(data, c.month, 6);
   const maxF = Math.max(1, ...fut.map(f => f.total));
   const active = data.installments.filter(i => { const p = parcelInfo(i, c.month); return p.active || p.idx < 1; });
+  // Já terminaram antes do mês visto (continuam salvas, só não estão mais ativas).
+  const ended = data.installments.filter(i => parcelInfo(i, c.month).idx > i.n);
+  const [showEnded, setShowEnded] = useState(false);
   const invoices = dueInvoices(data, c).filter(i => i.fatura > 0 || i.paid > 0);
   const cardName = (id: string) => data.cards.find(k => k.id === id)?.name ?? id;
   // Pagar a fatura: usa primeiro o que está na caixinha do cartão (e tira de lá); o resto sai da conta.
@@ -118,6 +122,12 @@ export function Cards() {
             ? <div className="b-list">{active.map(i => <InstallmentRow key={i.id} inst={i} month={c.month} cardName={cardName(i.cardId)} onEdit={() => app.openForm("installment", i)} onDelete={() => app.askDelete("installments", i.id, "Parcelamento")} />)}</div>
             : <EmptyState icon="layers" title="Nenhuma compra parcelada" text={'Ao adicionar um gasto no cartão, marque "Parcelado".'} />}
         </Card>
+        {ended.length ? (
+          <Card className="b-mt" title="Parcelamentos encerrados" subtitle={ended.length + (ended.length === 1 ? " compra já quitada" : " compras já quitadas") + " até " + monthName(c.month)}
+            action={<Button variant="ghost" size="sm" onClick={() => setShowEnded(v => !v)}>{showEnded ? "Esconder" : "Mostrar"}</Button>}>
+            {showEnded ? <div className="b-list">{ended.map(i => <InstallmentRow key={i.id} inst={i} month={c.month} cardName={cardName(i.cardId)} onEdit={() => app.openForm("installment", i)} onDelete={() => app.askDelete("installments", i.id, "Parcelamento")} />)}</div> : null}
+          </Card>
+        ) : null}
       </div>
       <div className="b-col-side">
         <Card title="Renda futura comprometida" subtitle="Parcelas dos próximos 6 meses">

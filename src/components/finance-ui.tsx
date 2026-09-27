@@ -316,7 +316,7 @@ export function InstallmentRow({ inst, month, cardName, onEdit, onDelete }: { in
       </div>
       <div className="b-inst-nums">
         <span>Parcela <strong>{done + "/" + inst.n}</strong></span>
-        <span>{pi.remaining > 0 ? <>Faltam {pi.remaining} · <Money value={pi.remaining * inst.amount} /></> : "Última parcela"}</span>
+        <span>{pi.idx > inst.n ? "Quitada em " + monthName(addMonths(inst.start, inst.n - 1)) : pi.remaining > 0 ? <>Faltam {pi.remaining} · <Money value={pi.remaining * inst.amount} /></> : "Última parcela"}</span>
       </div>
       {onEdit || onDelete ? <RowActions onEdit={onEdit} onDelete={onDelete} /> : null}
     </div>

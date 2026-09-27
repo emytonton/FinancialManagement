@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import { addMonths, cx, dateIn, dayOf, ddmm, fmt, pct, round2, uid, ym } from "@/lib/format";
-import { invoiceMonth } from "@/lib/finance";
-import type { Collection, Data } from "@/lib/types";
+import { addMonths, cx, dateIn, dayOf, ddmm, fmt, monthName, pct, round2, uid, ym } from "@/lib/format";
+import { installmentStart, invoiceMonth, parcelInfo } from "@/lib/finance";
+import type { Collection, Data, Installment } from "@/lib/types";
 import { Button, CatIcon, Field, Icon, Input, MoneyInput, Notice, Segmented, Select, Sheet, Toggle } from "../ui";
 import { useApp, type AddState, type AddTab, type FormKind } from "./store";
 
@@ -171,7 +171,7 @@ export function FormHost() {
       onSave={v => {
         const o = def.save ? def.save(v, data) : v;
         app.upsert(def.coll, { ...(form.item || {}), ...o } as never);
-        app.toast(form.item ? "Alterações salvas" : "Adicionado");
+        app.toast((def.coll === "installments" && endedMsg(data, { ...(form.item || {}), ...o } as unknown as Installment, app.month)) || (form.item ? "Alterações salvas" : "Adicionado"));
       }}
       onDelete={form.item ? v => app.askDelete(def.coll, String(v.id), def.title) : undefined} />
   );
@@ -183,6 +183,13 @@ function invoiceHint(data: Data, cardId: string, date: string, prefix: string) {
   if (!card || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const due = dateIn(addMonths(invoiceMonth(card, date), 1), card.dueDay);
   return prefix + ddmm(due) + " (fecha dia " + String(card.closeDay).padStart(2, "0") + ")";
+}
+
+// Parcelamento salvo que já terminou antes do mês visto: avisa onde ele foi parar.
+function endedMsg(data: Data, inst: Installment, month: string) {
+  const i = { ...inst, n: Number(inst.n), start: installmentStart(data, inst) };
+  if (parcelInfo(i, month).idx <= i.n) return null;
+  return "Salvo. As parcelas terminaram em " + monthName(addMonths(i.start, i.n - 1)) + ", então está em Parcelamentos encerrados";
 }
 
 type AddValues = {
@@ -225,8 +232,9 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
       if (v.kind === "compartilhado" && !(v.total >= v.amount)) { setErr("O total da compra precisa ser maior ou igual à sua parte."); return; }
       if (v.parcelado && isCard && !edit) {
         const card = data.cards.find(c => c.id === v.method);
-        app.upsert("installments", { id: uid(), desc: v.desc || "Compra parcelada", cardId: v.method, categoryId: v.categoryId, amount: round2(v.amount / v.n), n: Number(v.n), date: v.date, start: card ? invoiceMonth(card, v.date) : ym(v.date) });
-        app.toast("Compra parcelada em " + v.n + "x adicionada");
+        const inst = { id: uid(), desc: v.desc || "Compra parcelada", cardId: v.method, categoryId: v.categoryId, amount: round2(v.amount / v.n), n: Number(v.n), date: v.date, start: card ? invoiceMonth(card, v.date) : ym(v.date) };
+        app.upsert("installments", inst);
+        app.toast(endedMsg(data, inst, app.month) || "Compra parcelada em " + v.n + "x adicionada");
       } else if (v.kind === "fixa" && !edit) {
         app.upsert("bills", { id: uid(), name: v.desc || "Conta fixa", amount: v.amount, day: dayOf(v.date), categoryId: v.categoryId, method: v.method, paid: { [ym(v.date)]: true } });
         app.toast("Despesa fixa criada e marcada como paga neste mês");
