@@ -157,6 +157,12 @@ const FORMS: Record<FormKind, FormDef> = {
     load: b => ({ ...b, cardId: b.cardId || "" }),
     // undefined (e não ausente) para desligar do cartão ao editar.
     save: b => ({ ...b, amount: Number(b.amount) || 0, cardId: b.cardId || undefined }) },
+  repayment: { title: "Pagamento", coll: "repayments", fields: [
+    { key: "person", label: "Para quem", required: true, placeholder: "Ex.: Namorado" },
+    { key: "amount", label: "Quanto você mandou", type: "money", required: true, half: true },
+    { key: "date", label: "Data", type: "date", required: true, half: true },
+    { key: "note", label: "Observação", placeholder: "Opcional (ex.: Pix)" }],
+    blank: (_d, _month, today) => ({ id: uid(), person: "", amount: 0, date: today, note: "" }) },
   contribution: { title: "Aporte", coll: "contributions", fields: [
     { key: "amount", label: "Valor guardado", type: "money", required: true },
     { key: "goalId", label: "Meta", type: "select", half: true },
@@ -254,6 +260,7 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
         app.toast("Despesa fixa criada e marcada como paga neste mês");
       } else {
         const shared = v.kind === "compartilhado";
+        if (shared && !v.paidBy.trim()) { setErr("Diga quem pagou a compra."); return; }
         app.upsert("txs", {
           id: editId || uid(), date: v.date, desc: v.desc.trim() || cats.find(c => c.id === v.categoryId)?.name || "Gasto",
           categoryId: v.categoryId, method: shared ? "pix" : v.method, amount: round2(v.amount), kind: shared ? "compartilhado" : "pessoal",
@@ -281,6 +288,8 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
   const tabs = [{ value: "gasto" as const, label: "Gasto", icon: "arrowUpRight" }, { value: "receita" as const, label: "Entrada", icon: "arrowDownLeft" }, { value: "aporte" as const, label: "Guardar", icon: "piggy" }];
   const kinds = [{ value: "pessoal" as const, label: "Pessoal" }, { value: "compartilhado" as const, label: "Compartilhado" }, { value: "fixa" as const, label: "Despesa fixa" }];
   const src = data.sources.find(s => s.id === v.sourceId);
+  // Nomes já usados em "Pago por" e em pagamentos, para sugerir ao digitar.
+  const people = [...new Set([...data.txs.map(x => x.paidBy || ""), ...data.repayments.map(r => r.person)].map(n => n.trim()).filter(Boolean))];
   const perSource = src ? round2(src.expected / (src.days.length || 1)) : 0;
   const amountKey = tab + amtRev;
 
@@ -311,9 +320,12 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
         {v.kind === "compartilhado" ? (
           <div className="b-form b-form-inset">
             <Field label="Total da compra" className="is-half"><MoneyInput key={"tot" + amountKey} value={v.total} onChange={x => set({ total: x })} /></Field>
-            <Field label="Pago por" className="is-half"><Input value={v.paidBy} placeholder="Quem pagou" onChange={e => set({ paidBy: e.target.value })} /></Field>
-            <Field label="Status"><Segmented options={[{ value: "pendente" as const, label: "Preciso reembolsar" }, { value: "reembolsado" as const, label: "Já reembolsei" }]} value={v.status} onChange={s => set({ status: s })} size="sm" /></Field>
-            {v.total > 0 ? <p className="b-muted b-small">Sua parte é {pct(v.amount / v.total)} da compra. Só ela entra nos seus gastos.</p> : null}
+            <Field label="Pago por" className="is-half">
+              <Input value={v.paidBy} placeholder="Quem pagou" list="b-people" onChange={e => set({ paidBy: e.target.value })} />
+              <datalist id="b-people">{people.map(p => <option key={p} value={p} />)}</datalist>
+            </Field>
+            {v.total > 0 ? <p className="b-muted b-small">Sua parte é {pct(v.amount / v.total)} da compra. Só ela entra nos seus gastos e no que você deve na aba Reembolsos.</p> : null}
+            <p className="b-muted b-small">Usou o cartão de outra pessoa numa compra só sua? Coloque o mesmo valor em &quot;Total da compra&quot; e em &quot;Minha parte&quot;.</p>
           </div>
         ) : (
           <Field label="Forma de pagamento">

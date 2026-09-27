@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { dateIn, dayOf, monthName, pad } from "@/lib/format";
-import { dueInvoices, type MonthBill } from "@/lib/finance";
+import { debtsFor, dueInvoices, type MonthBill } from "@/lib/finance";
 import { Button, Card, EmptyState, IconButton, Money, Segmented, UpcomingItem } from "../ui";
 import { CalendarMonth, EVENT_TYPES } from "../finance-ui";
 import { useApp } from "../app/store";
@@ -20,7 +20,9 @@ export function Calendar() {
   dueInvoices(data, c).forEach(inv => {
     if (inv.fatura > 0 || inv.paid > 0) events.push({ date: inv.due, type: "card", label: "Fatura " + inv.card.name, amount: inv.paid || inv.fatura, status: inv.paid >= inv.fatura - 0.009 ? "paga" : undefined });
   });
-  c.txs.filter(x => x.kind === "compartilhado").forEach(x => events.push({ date: x.date, type: "refund", label: "Reembolso: " + x.desc, amount: x.amount, status: x.status === "pendente" ? "pendente" : "paga" }));
+  const openOf = new Map(debtsFor(data, "9999-12-31").flatMap(p => p.items.map(i => [i.tx.id, i.open] as const)));
+  c.txs.filter(x => x.kind === "compartilhado").forEach(x => events.push({ date: x.date, type: "refund", label: "Pago por " + (x.paidBy || "outra pessoa") + ": " + x.desc, amount: x.amount, status: (openOf.get(x.id) ?? 0) > 0.009 ? "pendente" : "paga" }));
+  c.repaid.forEach(r => events.push({ date: r.date, type: "refund", label: "Você devolveu para " + r.person, amount: r.amount, status: "paga" }));
   c.contribs.forEach(x => { const g = data.goals.find(k => k.id === x.goalId); events.push({ date: x.date, type: "goal", label: "Aporte: " + (g ? g.name : "meta"), amount: x.amount }); });
   const dayEv = events.filter(e => dayOf(e.date) === sel);
   const setStatus = (b: MonthBill, st: string) => {

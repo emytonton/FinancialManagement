@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import { addMonths, cx, dateIn, ddmm, monthLabel, sum, weekday, ym } from "@/lib/format";
-import { billsFor, parcelInfo } from "@/lib/finance";
+import { billsFor, debtsFor, parcelInfo } from "@/lib/finance";
 import type { Category, Tx } from "@/lib/types";
-import { Button, Card, CatIcon, EmptyState, Icon, Money, Segmented, Select, TransactionRow, type RowTx } from "../ui";
+import { Button, Card, EmptyState, Icon, Money, Segmented, Select, TransactionRow, type RowTx } from "../ui";
 import { useApp } from "../app/store";
 import { PageHead } from "./common";
 
@@ -24,9 +24,14 @@ export function Transactions({ dir: initialDir, flag: initialFlag }: { dir?: str
   const inP = (d: string) => !months || months.includes(ym(d));
 
   let items: Item[] = [];
-  data.txs.filter(x => inP(x.date)).forEach(x => items.push({
+  // Compra compartilhada: "A reembolsar" enquanto ainda tiver valor em aberto com a pessoa.
+  const debts = debtsFor(data, "9999-12-31");
+  const openOf = new Map(debts.flatMap(p => p.items.map(i => [i.tx.id, i.open] as const)));
+  const withStatus = (x: Tx): Tx => x.kind === "compartilhado" && x.status !== "reembolsado" ? { ...x, status: (openOf.get(x.id) ?? 0) > 0.009 ? "pendente" : "reembolsado" } : x;
+  data.txs.filter(x => inP(x.date)).map(withStatus).forEach(x => items.push({
     key: "tx" + x.id, date: x.date, tx: x, cat: catOf(x.categoryId),
-    edit: () => app.openEdit("gasto", x as unknown as Record<string, unknown>), del: () => app.askDelete("txs", x.id, "Gasto"),
+    // Edita a compra original (o status acima é só para exibir).
+    edit: () => app.openEdit("gasto", data.txs.find(t => t.id === x.id) as unknown as Record<string, unknown>), del: () => app.askDelete("txs", x.id, "Gasto"),
   }));
   data.incomes.filter(x => inP(x.date)).forEach(x => {
     const s = data.sources.find(k => k.id === x.sourceId);
@@ -63,30 +68,19 @@ export function Transactions({ dir: initialDir, flag: initialFlag }: { dir?: str
   const tin = sum(items.filter(i => i.income), i => i.tx.amount);
   // Gastos de outras pessoas só somam nas saídas quando você filtra pela categoria delas.
   const tout = sum(items.filter(i => !i.income && (!i.cat?.thirdParty || cat === i.cat.id)), i => i.tx.amount);
-  const pend = data.txs.filter(x => x.kind === "compartilhado" && x.status === "pendente");
-  const markRefunded = (x: Tx) => { app.upsert("txs", { ...x, status: "reembolsado" }); app.toast("Marcado como reembolsado"); };
+  const owing = debts.filter(p => p.owed > 0);
   const clear = () => { setQ(""); setDir("todas"); setCat(""); setMethod(""); setFlag(""); };
 
   return <>
     <PageHead title="Transações" sub="Tudo que entrou e saiu" actions={<Button icon="plus" onClick={() => app.openAdd()}>Adicionar</Button>} />
-    {pend.length ? (
-      <Card className="b-refunds" title="Reembolsos pendentes" subtitle="Valores que você precisa devolver" action={<Money value={sum(pend, x => x.amount)} className="b-amount b-tone-warning" />}>
+    {owing.length ? (
+      <Card className="b-refunds" title="Você deve a outras pessoas" subtitle="Compras que alguém pagou por você" action={<Button size="sm" variant="secondary" icon="users" onClick={() => app.go("reembolsos")}>Abrir Reembolsos</Button>}>
         <div className="b-list">
-          {pend.map(x => (
-            <div key={x.id} className="b-refund">
-              <CatIcon cat={catOf(x.categoryId)} size={36} />
-              <div className="b-tx-main">
-                <span className="b-tx-desc">{x.desc}</span>
-                <span className="b-tx-meta">Total <Money value={x.total || 0} /> · pago por {x.paidBy} · {ddmm(x.date)}</span>
-              </div>
-              <Money value={x.amount} className="b-strong" />
-              <Button size="sm" variant="secondary" icon="check" onClick={() => markRefunded(x)}>Reembolsei</Button>
-            </div>
-          ))}
+          {owing.map(p => <div key={p.key} className="b-total-row"><span>{p.name}</span><Money value={p.owed} className="b-strong b-tone-warning" /></div>)}
         </div>
       </Card>
     ) : null}
-    <Card flush className={pend.length ? "b-mt" : undefined}>
+    <Card flush className={owing.length ? "b-mt" : undefined}>
       <div className="b-filters">
         <div className="b-search"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por descrição ou categoria" aria-label="Buscar" /></div>
         <div className="b-filter-row">

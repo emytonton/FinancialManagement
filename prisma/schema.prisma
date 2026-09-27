@@ -180,3 +180,14 @@ model Box {
   amount Decimal @db.Decimal(12, 2)
   cardId String?
 }
+
+// Dinheiro que você devolveu para quem pagou compras por você (ex.: namorado no mercado).
+// Abate do saldo daquela pessoa, na ordem das compras mais antigas.
+model Repayment {
+  id     String   @id
+  seq    Int      @default(autoincrement())
+  person String
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
+  note   String   @default("")
+}

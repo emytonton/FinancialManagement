@@ -13,6 +13,7 @@ const NAV: { id: Route; label: string; icon: string }[] = [
   { id: "cartoes", label: "Cartões", icon: "card" },
   { id: "caixinhas", label: "Caixinhas", icon: "piggy" },
   { id: "contas", label: "Assinaturas e contas", icon: "repeat" },
+  { id: "reembolsos", label: "Reembolsos", icon: "users" },
   { id: "orcamento", label: "Orçamento", icon: "pie" },
   { id: "metas", label: "Metas", icon: "target" },
   { id: "calendario", label: "Calendário", icon: "calendar" },

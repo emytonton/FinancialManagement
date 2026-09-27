@@ -9,12 +9,12 @@ import { dateIn, isoToday, ym } from "@/lib/format";
 import type { Collection, Data, ItemOf, Route, Settings } from "@/lib/types";
 
 export const ROUTE_PATHS: Record<Route, string> = {
-  dashboard: "/", transacoes: "/transacoes", cartoes: "/cartoes", caixinhas: "/caixinhas", contas: "/contas", orcamento: "/orcamento",
+  dashboard: "/", transacoes: "/transacoes", cartoes: "/cartoes", caixinhas: "/caixinhas", contas: "/contas", reembolsos: "/reembolsos", orcamento: "/orcamento",
   metas: "/metas", calendario: "/calendario", receitas: "/receitas", config: "/config",
 };
 
 export type AddTab = "gasto" | "receita" | "aporte";
-export type FormKind = "category" | "source" | "bill" | "card" | "installment" | "goal" | "income" | "contribution" | "personPayment" | "box" | "subscription";
+export type FormKind = "category" | "source" | "bill" | "card" | "installment" | "goal" | "income" | "contribution" | "personPayment" | "box" | "subscription" | "repayment";
 export type AddState = { tab: AddTab; preset?: Record<string, unknown>; edit?: { tab: AddTab; item: Record<string, unknown> } } | null;
 export type FormState = { kind: FormKind; item?: Record<string, unknown>; preset?: Record<string, unknown> } | null;
 export type DeleteState = { coll: Collection; id: string; label: string } | null;

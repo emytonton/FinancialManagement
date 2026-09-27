@@ -39,7 +39,7 @@ export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
   const parts = [
     { key: "faturas", label: "Faturas que vencem em " + monthName(c.month), hint: c.cards.length ? ("vence " + ddmm(dateIn(c.month, c.cards[0].dueDay)) + (c.invoices.some(i => i.coveredPrev > 0) ? ", já tirando a caixinha" : "") + "; toque Paguei em Cartões ao pagar") : "sem cartões", value: c.faturasAbertas, o: 1 },
     { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s"), value: c.contasAVencer, o: 0.72 },
-    { key: "reemb", label: "Reembolsos pendentes", hint: "sua parte a devolver", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
+    { key: "reemb", label: "Você deve a outras pessoas", hint: c.reembolsos.length ? c.reembolsos.map(r => r.desc).join(", ") + " · veja em Reembolsos" : "nada pendente", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
     { key: "guardar", label: "Falta guardar", hint: "meta de " + pct(c.metaGuardar / (c.receitas || 1)), value: c.faltaGuardar, o: 0.3 },
   ];
   const total = Math.max(c.emConta, 1);

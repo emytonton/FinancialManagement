@@ -44,6 +44,13 @@ Dinheiro separado fora do saldo da conta (como as caixinhas do Mercado Pago). Ca
 - **Assinatura:** valor, dia da cobrança, forma de pagamento e mês da primeira cobrança (e da última, ao cancelar). Entra sozinha todo mês: na fatura do cartão (respeitando o fechamento) ou saindo da conta.
 - **Conta fixa:** tipo (Luz, Água, Internet...), valor previsto e vencimento. Ao tocar em **Paguei**, você confirma ou ajusta o valor daquele mês; os outros meses continuam com o previsto.
 
+## Reembolsos
+
+Para compras que outra pessoa pagou por você (o mercado no cartão do namorado, uma compra sua no cartão de alguém). Registre como gasto **Compartilhado**, com quem pagou, o total e a sua parte. A aba **Reembolsos** mostra o saldo por pessoa: sua parte nas compras menos os valores que você já mandou. Pagamentos soltos abatem das compras mais antigas primeiro; **Quitar tudo** zera o saldo.
+
+- A sua parte entra nos gastos na data da compra.
+- O que você ainda deve fica reservado no livre para gastar; o dinheiro sai da conta quando você registra o pagamento.
+
 ## Rodando localmente
 
 Precisa de Node 20+.

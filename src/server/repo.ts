@@ -93,6 +93,11 @@ const tables = {
     toDb: (x: Input<"personPayments">) => ({ ...x, date: fromDay(x.date) }),
     fromDb: (r: any) => ({ id: r.id, categoryId: r.categoryId, month: r.month, date: toDay(r.date), amount: num(r.amount) }),
   },
+  repayments: {
+    model: (db: Client) => db.repayment,
+    toDb: (x: Input<"repayments">) => ({ ...x, date: fromDay(x.date) }),
+    fromDb: (r: any) => ({ id: r.id, person: r.person, date: toDay(r.date), amount: num(r.amount), note: r.note }),
+  },
   boxes: {
     model: (db: Client) => db.box,
     toDb: (x: Input<"boxes">) => ({ ...x, cardId: x.cardId || null }),
