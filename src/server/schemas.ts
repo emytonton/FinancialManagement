@@ -38,6 +38,7 @@ export const schemas = {
   installments: z.object({
     id, desc: text(120).min(1), cardId: z.string().max(64), categoryId: z.string().max(64),
     amount: money, n: z.number().int().min(1).max(72), start: month,
+    date: z.union([day, z.literal("")]).optional(),
   }),
   goals: z.object({
     id, name: text(60).min(1), icon: text(30), target: money, base: money,

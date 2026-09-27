@@ -1,7 +1,7 @@
 "use client";
 // Componentes que mostram os números do mês: herói, gráficos, cartões, metas.
 import { useEffect, useRef, useState } from "react";
-import { WEEK, addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, monthLabel, monthShort, pad, pct, round2, sum } from "@/lib/format";
+import { WEEK, addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, monthLabel, monthName, monthShort, pad, pct, round2, sum } from "@/lib/format";
 import { parcelInfo, stateOf, type Budget, type GoalStats, type Month, type MonthCard, type Point, type SpendRow } from "@/lib/finance";
 import type { Goal, Installment, Source } from "@/lib/types";
 import { Badge, Button, CatIcon, EmptyState, Icon, Money, ProgressBar, RowActions } from "./ui";
@@ -306,7 +306,7 @@ export function InstallmentRow({ inst, month, cardName, onEdit, onDelete }: { in
     <div className="b-inst">
       <div className="b-inst-main">
         <strong>{inst.desc}</strong>
-        <span className="b-muted">{inst.n}x de <Money value={inst.amount} /> · {cardName}</span>
+        <span className="b-muted">{inst.n}x de <Money value={inst.amount} /> · {cardName}{inst.date ? " · compra em " + ddmm(inst.date) + "/" + inst.date.slice(2, 4) : ""} · 1ª fatura de {monthName(inst.start)}</span>
       </div>
       <div className="b-inst-steps" aria-label={"Parcela " + done + " de " + inst.n}>
         {Array.from({ length: inst.n }, (_, i) => <span key={i} className={cx(i < done - 1 && "is-paid", i === done - 1 && "is-now")} />)}

@@ -124,9 +124,9 @@ export function Cards() {
       </div>
     </div>
     {c.cards.map(k => k.items.length ? (
-      <Card key={k.id} className="b-mt" title={"Compras na fatura " + k.name} subtitle={"Vence " + ddmm(k.due)}>
+      <Card key={k.id} className="b-mt" title={"Compras na fatura " + k.name} subtitle={"Fecha dia " + String(k.closeDay).padStart(2, "0") + " · vence " + ddmm(k.due) + ". Compras no dia do fechamento ou depois vão para a próxima."}>
         <div className="b-list">
-          {k.items.map((it, i) => <TransactionRow key={i} tx={{ desc: it.desc, amount: it.amount, method: k.id }} methodLabel={k.name} cat={data.categories.find(x => x.id === it.categoryId)} />)}
+          {k.items.map(it => <TransactionRow key={it.src + it.id} tx={{ desc: it.desc, amount: it.amount, method: k.id, installment: (it.src === "parcel" ? "compra " : "") + ddmm(it.date) }} methodLabel={k.name} cat={data.categories.find(x => x.id === it.categoryId)} />)}
         </div>
       </Card>
     ) : null)}

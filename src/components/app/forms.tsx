@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { cx, dayOf, fmt, pct, round2, uid, ym } from "@/lib/format";
+import { addMonths, cx, dateIn, dayOf, ddmm, fmt, pct, round2, uid, ym } from "@/lib/format";
+import { invoiceMonth } from "@/lib/finance";
 import type { Collection, Data } from "@/lib/types";
 import { Button, CatIcon, Field, Icon, Input, MoneyInput, Notice, Segmented, Select, Sheet, Toggle } from "../ui";
 import { useApp, type AddState, type AddTab, type FormKind } from "./store";
@@ -62,7 +63,7 @@ const COLOR_OPTIONS = [
   { value: "chart4", label: "Amarelo" }, { value: "chart5", label: "Rosa" }, { value: "chart6", label: "Violeta" }, { value: "other", label: "Cinza (agrupa em Outras)" },
 ];
 
-type FormDef = { title: string; coll: Collection; fields: FieldDef[]; blank?: (d: Data, month: string, today: string) => Values; load?: (x: Values) => Values; save?: (x: Values) => Values };
+type FormDef = { title: string; coll: Collection; fields: FieldDef[]; blank?: (d: Data, month: string, today: string) => Values; load?: (x: Values) => Values; save?: (x: Values, d: Data) => Values };
 
 const FORMS: Record<FormKind, FormDef> = {
   category: { title: "Categoria", coll: "categories", fields: [
@@ -108,10 +109,15 @@ const FORMS: Record<FormKind, FormDef> = {
     { key: "desc", label: "Descrição", required: true },
     { key: "amount", label: "Valor da parcela", type: "money", required: true, half: true },
     { key: "n", label: "Nº de parcelas", type: "number", min: 1, max: 72, half: true, required: true },
-    { key: "start", label: "Mês da 1ª parcela", type: "month", half: true, required: true },
     { key: "cardId", label: "Cartão", type: "select", half: true },
+    { key: "date", label: "Data da compra", type: "date", half: true },
+    { key: "start", label: "Mês da 1ª parcela", type: "month", half: true, required: true, show: v => !v.date, hint: "Sem a data da compra, informe o mês da fatura da 1ª parcela." },
     { key: "categoryId", label: "Categoria", type: "select" }],
-    blank: (d, month) => ({ id: uid(), desc: "", amount: 0, n: 10, start: month, cardId: d.cards[0]?.id || "", categoryId: d.categories.find(c => c.id === "comp")?.id || d.categories[0]?.id || "" }) },
+    blank: (d, _month, today) => ({ id: uid(), desc: "", amount: 0, n: 10, date: today, start: ym(today), cardId: d.cards[0]?.id || "", categoryId: d.categories.find(c => c.id === "comp")?.id || d.categories[0]?.id || "" }),
+    save: (v, d) => {
+      const card = d.cards.find(c => c.id === v.cardId);
+      return { ...v, date: v.date || "", start: v.date && card ? invoiceMonth(card, String(v.date)) : v.start };
+    } },
   goal: { title: "Meta", coll: "goals", fields: [
     { key: "name", label: "Nome da meta", required: true, placeholder: "Ex.: Reserva de emergência" },
     { key: "target", label: "Valor desejado", type: "money", required: true, half: true },
@@ -146,6 +152,7 @@ export function FormHost() {
     if (x.key === "goalId") return { ...x, options: data.goals.map(g => ({ value: g.id, label: g.name })) };
     if (x.key === "cardId") return { ...x, options: data.cards.map(c => ({ value: c.id, label: c.name })) };
     if (x.key === "method") return { ...x, options: app.methods.map(m => ({ value: m.id, label: m.name })) };
+    if (form.kind === "installment" && x.key === "date") return { ...x, hint: (v: Values) => invoiceHint(data, String(v.cardId || ""), String(v.date || ""), "1ª parcela na fatura que vence em ") };
     return x;
   });
   const value = form.item ? (def.load ? def.load(form.item) : form.item) : { ...(def.blank ? def.blank(data, app.month, app.today) : { id: uid() }), ...form.preset };
@@ -153,12 +160,20 @@ export function FormHost() {
   return (
     <EntityForm key={String(value.id)} title={(form.item ? "Editar " : "Nova ") + def.title.toLowerCase()} fields={fields} value={value} onClose={close}
       onSave={v => {
-        const o = def.save ? def.save(v) : v;
+        const o = def.save ? def.save(v, data) : v;
         app.upsert(def.coll, { ...(form.item || {}), ...o } as never);
         app.toast(form.item ? "Alterações salvas" : "Adicionado");
       }}
       onDelete={form.item ? v => app.askDelete(def.coll, String(v.id), def.title) : undefined} />
   );
+}
+
+// "Entra na fatura que vence em 10/10 (fecha dia 03)": mostra de que lado do fechamento a compra ficou.
+function invoiceHint(data: Data, cardId: string, date: string, prefix: string) {
+  const card = data.cards.find(c => c.id === cardId);
+  if (!card || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const due = dateIn(addMonths(invoiceMonth(card, date), 1), card.dueDay);
+  return prefix + ddmm(due) + " (fecha dia " + String(card.closeDay).padStart(2, "0") + ")";
 }
 
 type AddValues = {
@@ -200,7 +215,8 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
       if (!v.categoryId) { setErr("Escolha uma categoria."); return; }
       if (v.kind === "compartilhado" && !(v.total >= v.amount)) { setErr("O total da compra precisa ser maior ou igual à sua parte."); return; }
       if (v.parcelado && isCard && !edit) {
-        app.upsert("installments", { id: uid(), desc: v.desc || "Compra parcelada", cardId: v.method, categoryId: v.categoryId, amount: round2(v.amount / v.n), n: Number(v.n), start: ym(v.date) });
+        const card = data.cards.find(c => c.id === v.method);
+        app.upsert("installments", { id: uid(), desc: v.desc || "Compra parcelada", cardId: v.method, categoryId: v.categoryId, amount: round2(v.amount / v.n), n: Number(v.n), date: v.date, start: card ? invoiceMonth(card, v.date) : ym(v.date) });
         app.toast("Compra parcelada em " + v.n + "x adicionada");
       } else if (v.kind === "fixa" && !edit) {
         app.upsert("bills", { id: uid(), name: v.desc || "Conta fixa", amount: v.amount, day: dayOf(v.date), categoryId: v.categoryId, method: v.method, paid: { [ym(v.date)]: true } });
@@ -280,7 +296,9 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
           </Field>
         )}
         <div className="b-form">
-          <Field label="Data" className="is-half"><Input type="date" value={v.date} onChange={e => set({ date: e.target.value })} /></Field>
+          <Field label="Data" className="is-half" hint={isCard ? invoiceHint(data, v.method, v.date, v.parcelado ? "1ª parcela na fatura que vence em " : "Entra na fatura que vence em ") : undefined}>
+            <Input type="date" value={v.date} onChange={e => set({ date: e.target.value })} />
+          </Field>
           {isCard && v.kind === "pessoal" && !edit ? (
             <Field label="Parcelado?" className="is-half">
               <Segmented options={[{ value: false, label: "Não" }, { value: true, label: "Sim" }]} value={v.parcelado} onChange={p => set({ parcelado: p })} size="sm" />

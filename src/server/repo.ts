@@ -70,8 +70,8 @@ const tables = {
   },
   installments: {
     model: (db: Client) => db.installment,
-    toDb: (x: Input<"installments">) => x,
-    fromDb: (r: any) => ({ id: r.id, desc: r.desc, cardId: r.cardId, categoryId: r.categoryId, amount: num(r.amount), n: r.n, start: r.start }),
+    toDb: (x: Input<"installments">) => ({ ...x, date: x.date ? fromDay(x.date) : null }),
+    fromDb: (r: any) => ({ id: r.id, desc: r.desc, cardId: r.cardId, categoryId: r.categoryId, amount: num(r.amount), n: r.n, start: r.start, ...(r.date ? { date: toDay(r.date) } : {}) }),
   },
   goals: {
     model: (db: Client) => db.goal,

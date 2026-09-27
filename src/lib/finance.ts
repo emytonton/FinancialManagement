@@ -180,6 +180,22 @@ export function parcelInfo(inst: Installment, month: string) {
   return { idx, active: idx >= 1 && idx <= inst.n, remaining: Math.max(0, inst.n - Math.max(idx, 0)) };
 }
 
+// Fatura em que uma compra no cartão cai, identificada pelo mês da tabela (a que vence no mês seguinte).
+// Compra antes do dia de fechamento entra na fatura que fecha neste mês; no dia do fechamento ou depois, na próxima.
+export function invoiceMonth(card: Pick<CreditCard, "closeDay" | "dueDay">, date: string) {
+  const m = ym(date);
+  const close = Math.min(card.closeDay, dim(m));
+  const closeMonth = dayOf(date) < close ? m : addMonths(m, 1);
+  const dueMonth = card.dueDay > card.closeDay ? closeMonth : addMonths(closeMonth, 1);
+  return addMonths(dueMonth, -1);
+}
+
+// Mês da 1ª parcela: pela data da compra quando existe; parcelas antigas usam o mês gravado.
+export function installmentStart(data: Data, inst: Installment) {
+  const card = data.cards.find(c => c.id === inst.cardId);
+  return inst.date && card ? invoiceMonth(card, inst.date) : inst.start;
+}
+
 export type BillStatus = "paga" | "pendente" | "atrasada";
 export function billStatus(bill: Bill, month: string, today: string): BillStatus {
   if (bill.paid && bill.paid[month]) return "paga";
@@ -189,17 +205,27 @@ export function billStatus(bill: Bill, month: string, today: string): BillStatus
   return "pendente";
 }
 
-// Fatura de um cartão num mês: compras no cartão, contas fixas pagas nele e parcelas.
-// Mesma regra de compute(), sem recursão, para poder olhar o mês anterior.
-// Com onlyMine, deixa de fora o que foi gasto nas categorias de outras pessoas (Mãe, Pai).
+export type InvoiceItem = { src: "tx" | "bill" | "parcel"; id: string; date: string; desc: string; amount: number; categoryId: string };
+
+// Tudo que cai numa fatura (mês da tabela = fatura que vence no mês seguinte):
+// compras no cartão e contas fixas pagas nele, pelo dia de fechamento; e as parcelas do mês.
+export function invoiceItems(data: Data, card: CreditCard, month: string, today: string): InvoiceItem[] {
+  const tx = data.txs.filter(x => x.method === card.id && x.kind !== "compartilhado" && invoiceMonth(card, x.date) === month)
+    .map(x => ({ src: "tx" as const, id: x.id, date: x.date, desc: x.desc, amount: x.amount, categoryId: x.categoryId }));
+  const bills = [addMonths(month, -1), month, addMonths(month, 1)].flatMap(m => data.bills
+    .filter(b => b.method === card.id && billStatus(b, m, today) === "paga" && invoiceMonth(card, dateIn(m, b.day)) === month)
+    .map(b => ({ src: "bill" as const, id: b.id + m, date: dateIn(m, b.day), desc: b.name, amount: b.amount, categoryId: b.categoryId })));
+  const parcels = data.installments.filter(i => i.cardId === card.id).flatMap(i => {
+    const p = parcelInfo(i, month);
+    return p.active ? [{ src: "parcel" as const, id: i.id, date: i.date || dateIn(month, card.closeDay), desc: i.desc + " " + p.idx + "/" + i.n, amount: i.amount, categoryId: i.categoryId }] : [];
+  });
+  return [...tx, ...bills, ...parcels].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// Valor de uma fatura. Com onlyMine, deixa de fora as categorias de outras pessoas (Mãe, Pai).
 export function cardInvoice(data: Data, card: CreditCard, month: string, today: string, onlyMine = false) {
-  const inMonth = (x: { date: string }) => ym(x.date) === month;
   const third = thirdIdsOf(data);
-  const keep = (categoryId: string) => !onlyMine || !third.has(categoryId);
-  const tx = data.txs.filter(x => inMonth(x) && x.method === card.id && x.kind !== "compartilhado" && keep(x.categoryId));
-  const bills = data.bills.filter(b => b.method === card.id && billStatus(b, month, today) === "paga" && keep(b.categoryId));
-  const parcels = data.installments.filter(i => i.cardId === card.id && parcelInfo(i, month).active && keep(i.categoryId));
-  return round2(sum(tx, x => x.amount) + sum(bills, b => b.amount) + sum(parcels, p => p.amount));
+  return round2(sum(invoiceItems(data, card, month, today).filter(i => !onlyMine || !third.has(i.categoryId)), i => i.amount));
 }
 
 // Categorias de outra pessoa: o gasto passa pelo seu cartão/conta, mas quem paga é ela.
@@ -210,11 +236,13 @@ export type ThirdParty = { cat: Category; spent: number; onCards: number; owedOn
 // Quanto cada pessoa gastou no mês (em qualquer forma de pagamento) e quanto já te devolveu.
 export function thirdPartyFor(data: Data, month: string, today: string): ThirdParty[] {
   const inMonth = (x: { date: string }) => ym(x.date) === month;
+  const cardIds = cardIdsOf(data);
   return data.categories.filter(c => c.thirdParty).map(cat => {
+    // No cartão, conta a fatura do mês (respeita o fechamento); no Pix/débito/dinheiro, a data do gasto.
     const items = [
-      ...data.txs.filter(x => inMonth(x) && x.categoryId === cat.id).map(x => ({ method: x.method, amount: x.amount })),
-      ...data.installments.filter(i => i.categoryId === cat.id && parcelInfo(i, month).active).map(i => ({ method: i.cardId, amount: i.amount })),
-      ...data.bills.filter(b => b.categoryId === cat.id && billStatus(b, month, today) === "paga").map(b => ({ method: b.method, amount: b.amount })),
+      ...data.cards.flatMap(k => invoiceItems(data, k, month, today).filter(i => i.categoryId === cat.id).map(i => ({ method: k.id, amount: i.amount }))),
+      ...data.txs.filter(x => inMonth(x) && x.categoryId === cat.id && !cardIds.has(x.method)).map(x => ({ method: x.method, amount: x.amount })),
+      ...data.bills.filter(b => b.categoryId === cat.id && !cardIds.has(b.method) && billStatus(b, month, today) === "paga").map(b => ({ method: b.method, amount: b.amount })),
     ];
     const byMethod: Record<string, number> = {};
     items.forEach(i => { byMethod[i.method] = round2((byMethod[i.method] || 0) + i.amount); });
@@ -234,7 +262,7 @@ export type Budget = { cat: Category; limit: number; spent: number; pend: number
 export type MonthBill = Bill & { status: BillStatus; date: string };
 export type MonthCard = CreditCard & {
   fatura: number; faturaMinha: number; faturaTerceiros: number; futuro: number; usado: number; disponivel: number; ratio: number; due: string;
-  items: { date: string; desc: string; amount: number; categoryId: string }[];
+  items: InvoiceItem[];
 };
 export type Expected = { source: Source; date: string; amount: number };
 export type Month = ReturnType<typeof compute>;
@@ -273,19 +301,12 @@ export function compute(data: Data, month: string, today: string) {
   const reembolsoTotal = round2(sum(data.txs.filter(x => x.kind === "compartilhado" && x.status === "pendente"), x => x.amount));
 
   const cards: MonthCard[] = data.cards.map(c => {
-    const fromTx = txs.filter(x => x.method === c.id && x.kind !== "compartilhado");
-    const fromBills = bills.filter(b => b.method === c.id && b.status === "paga");
-    const fromParcels = parcels.filter(p => p.cardId === c.id);
-    const fatura = round2(sum(fromTx, x => x.amount) + sum(fromBills, b => b.amount) + sum(fromParcels, p => p.amount));
-    const faturaTerceiros = round2(sum(fromTx.filter(x => !mine(x.categoryId)), x => x.amount) + sum(fromBills.filter(b => !mine(b.categoryId)), b => b.amount) + sum(fromParcels.filter(p => !mine(p.categoryId)), p => p.amount));
+    const items = invoiceItems(data, c, month, today);
+    const fatura = round2(sum(items, i => i.amount));
+    const faturaTerceiros = round2(sum(items.filter(i => !mine(i.categoryId)), i => i.amount));
     const futuro = round2(sum(data.installments.filter(i => i.cardId === c.id), i => { const pi = parcelInfo(i, month); return pi.idx < 1 ? i.n * i.amount : pi.remaining * i.amount; }));
     const usado = round2(fatura + futuro);
     const due = dateIn(addMonths(month, 1), c.dueDay);
-    const items = [
-      ...fromTx.map(x => ({ date: x.date, desc: x.desc, amount: x.amount, categoryId: x.categoryId })),
-      ...fromBills.map(b => ({ date: b.date, desc: b.name, amount: b.amount, categoryId: b.categoryId })),
-      ...fromParcels.map(p => ({ date: dateIn(month, c.closeDay), desc: p.desc + " " + p.idx + "/" + p.n, amount: p.amount, categoryId: p.categoryId })),
-    ].sort((a, b) => b.date.localeCompare(a.date));
     return { ...c, fatura, faturaMinha: round2(fatura - faturaTerceiros), faturaTerceiros, futuro, usado, disponivel: round2(c.limit - usado), ratio: c.limit ? usado / c.limit : 0, due, items };
   });
   // faturas = só a sua parte; faturasTotal = o valor real que vem na fatura.

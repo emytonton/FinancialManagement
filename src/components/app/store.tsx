@@ -4,7 +4,7 @@
 // se o servidor recusar, avisa e recarrega os dados verdadeiros.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { compute, methodsOf, type Month } from "@/lib/finance";
+import { compute, installmentStart, methodsOf, type Month } from "@/lib/finance";
 import { dateIn, isoToday, ym } from "@/lib/format";
 import type { Collection, Data, ItemOf, Route, Settings } from "@/lib/types";
 
@@ -58,7 +58,9 @@ const hideStore = {
 
 function useStoreValue(initialData: Data) {
   const router = useRouter();
-  const [data, setData] = useState<Data>(initialData);
+  const [raw, setData] = useState<Data>(initialData);
+  // O mês da 1ª parcela sai da data da compra + fechamento do cartão (muda junto se você editar o cartão).
+  const data = useMemo<Data>(() => ({ ...raw, installments: raw.installments.map(i => ({ ...i, start: installmentStart(raw, i) })) }), [raw]);
   const today = data.settings.demo ? data.settings.demoToday : isoToday();
   const [month, setMonth] = useState(ym(today));
   const hide = useSyncExternalStore(hideStore.subscribe, hideStore.get, () => false);

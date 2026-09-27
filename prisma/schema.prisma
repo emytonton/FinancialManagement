@@ -117,6 +117,8 @@ model Installment {
   amount     Decimal @db.Decimal(12, 2)
   n          Int
   start      String
+  // Dia da compra; define em qual fatura cai a 1ª parcela.
+  date       DateTime? @db.Date
 }
 
 model Goal {

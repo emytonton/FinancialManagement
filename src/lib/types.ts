@@ -16,7 +16,8 @@ export interface Income { id: string; sourceId: string; date: string; amount: nu
 export interface Bill { id: string; name: string; amount: number; day: number; categoryId: string; method: string; paid: Record<string, boolean> }
 export interface CreditCard { id: string; name: string; limit: number; closeDay: number; dueDay: number; color: CardColor }
 export interface CardPayment { id: string; cardId: string; date: string; amount: number }
-export interface Installment { id: string; desc: string; cardId: string; categoryId: string; amount: number; n: number; start: string }
+// start = mês da 1ª parcela (fatura). Com date (dia da compra), start é recalculado pelo fechamento do cartão.
+export interface Installment { id: string; desc: string; cardId: string; categoryId: string; amount: number; n: number; start: string; date?: string }
 export interface Goal { id: string; name: string; icon: string; target: number; base: number; deadline: string; monthly: number }
 export interface Contribution { id: string; goalId: string; date: string; amount: number }
 // Dinheiro que quem usa uma categoria de terceiro (Mãe, Pai) te devolveu; month = mês dos gastos cobertos.
