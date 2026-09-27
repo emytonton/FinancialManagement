@@ -30,6 +30,11 @@ export const schemas = {
   bills: z.object({
     id, name: text(60).min(1), amount: money, day: dayOfMonth, categoryId: z.string().max(64), method: text(64),
     paid: z.record(month, z.boolean()),
+    kind: z.enum(["conta", "assinatura"]).default("conta"),
+    type: text(30).optional(),
+    start: z.union([month, z.literal("")]).optional(),
+    end: z.union([month, z.literal("")]).optional(),
+    amounts: z.record(month, money).default({}),
   }),
   cards: z.object({
     id, name: text(40).min(1), limit: money, closeDay: dayOfMonth, dueDay: dayOfMonth, color: z.enum(["nubank", "mp"]),

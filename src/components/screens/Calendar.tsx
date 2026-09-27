@@ -46,9 +46,9 @@ export function Calendar() {
       </div>
       <div className="b-col-side">
         <Card title="Contas fixas" subtitle="Marque como paga quando pagar" action={<IconButton icon="plus" label="Nova conta" onClick={() => app.openForm("bill")} />}>
-          {c.bills.length ? (
+          {c.bills.some(b => b.kind !== "assinatura") ? (
             <div className="b-list">
-              {c.bills.slice().sort((a, z) => a.day - z.day).map(b => (
+              {c.bills.filter(b => b.kind !== "assinatura").sort((a, z) => a.day - z.day).map(b => (
                 <div key={b.id} className="b-bill">
                   <div className="b-bill-top">
                     <div className="b-tx-main"><span className="b-tx-desc">{b.name}</span><span className="b-tx-meta">{"Dia " + pad(b.day) + " · " + app.methodName(b.method)}</span></div>

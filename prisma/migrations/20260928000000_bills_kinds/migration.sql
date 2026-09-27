@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Bill" ADD COLUMN "kind" TEXT NOT NULL DEFAULT 'conta',
+ADD COLUMN "type" TEXT,
+ADD COLUMN "start" TEXT,
+ADD COLUMN "end" TEXT,
+ADD COLUMN "amounts" JSONB NOT NULL DEFAULT '{}';

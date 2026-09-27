@@ -61,6 +61,12 @@ const ICONS: Record<string, string> = {
   shield: "M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z",
   file: "M6 3h8.5L19 7.5V21H6zM14 3v5h5",
   logout: "M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10",
+  drop: "M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z",
+  wifi: "M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0M12 19.5h.01",
+  building: "M5 21V4h10v17M15 9h4v12M3 21h18M8.5 8h3M8.5 12h3M8.5 16h3",
+  flame: "M12 21a6.5 6.5 0 0 0 6.5-6.5c0-4-3-6.5-4.5-9.5-.8 2.2-2 3.5-3.5 4.3C9 8 8.5 6.6 8.6 5 6.8 7 5.5 9.9 5.5 14.5A6.5 6.5 0 0 0 12 21z",
+  phone: "M7.5 2.5h9v19h-9zM11 18.5h2",
+  book: "M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5",
 };
 
 export function Icon({ name, size = 20, className, strokeWidth = 1.8, title }: { name: string; size?: number; className?: string; strokeWidth?: number; title?: string }) {

@@ -108,12 +108,12 @@ export function mockData(): Data {
       t("2026-09-12", "Posto", "pai", "mp", 180),
     ],
     bills: [
-      { id: "b1", name: "Spotify", amount: 21.9, day: 8, categoryId: "assin", method: "nubank", paid: { "2026-08": true, "2026-09": true } },
-      { id: "b2", name: "Streaming", amount: 39.9, day: 12, categoryId: "assin", method: "nubank", paid: { "2026-08": true, "2026-09": true } },
-      { id: "b3", name: "Celular", amount: 45, day: 15, categoryId: "assin", method: "pix", paid: { "2026-08": true, "2026-09": true } },
-      { id: "b4", name: "Internet", amount: 99.9, day: 20, categoryId: "casa", method: "pix", paid: { "2026-08": true, "2026-09": true } },
-      { id: "b5", name: "Conta de luz", amount: 85, day: 27, categoryId: "casa", method: "pix", paid: { "2026-08": true } },
-      { id: "b6", name: "Academia", amount: 90, day: 30, categoryId: "saude", method: "pix", paid: { "2026-08": true } },
+      { id: "b1", name: "Spotify", amount: 21.9, day: 8, categoryId: "assin", method: "nubank", paid: {}, kind: "assinatura", start: "2026-01" },
+      { id: "b2", name: "Streaming", amount: 39.9, day: 12, categoryId: "assin", method: "nubank", paid: {}, kind: "assinatura", start: "2026-03" },
+      { id: "b3", name: "Celular", amount: 45, day: 15, categoryId: "assin", method: "pix", paid: { "2026-08": true, "2026-09": true }, kind: "conta", type: "celular" },
+      { id: "b4", name: "Internet", amount: 99.9, day: 20, categoryId: "casa", method: "pix", paid: { "2026-08": true, "2026-09": true }, kind: "conta", type: "internet" },
+      { id: "b5", name: "Conta de luz", amount: 85, day: 27, categoryId: "casa", method: "pix", paid: { "2026-08": true }, kind: "conta", type: "luz", amounts: { "2026-08": 92.4 } },
+      { id: "b6", name: "Academia", amount: 90, day: 30, categoryId: "saude", method: "pix", paid: { "2026-08": true }, kind: "conta", type: "outros" },
     ],
     cards: [
       { id: "nubank", name: "Nubank", limit: 3000, closeDay: 3, dueDay: 10, color: "nubank" },
@@ -211,8 +211,29 @@ export function installmentStart(data: Data, inst: Installment) {
   return inst.date && card ? invoiceMonth(card, inst.date) : inst.start;
 }
 
+// Tipos de conta fixa, com ícone.
+export const BILL_TYPES = [
+  { id: "luz", name: "Luz", icon: "zap" },
+  { id: "agua", name: "Água", icon: "drop" },
+  { id: "internet", name: "Internet", icon: "wifi" },
+  { id: "aluguel", name: "Aluguel", icon: "house" },
+  { id: "condominio", name: "Condomínio", icon: "building" },
+  { id: "gas", name: "Gás", icon: "flame" },
+  { id: "celular", name: "Celular", icon: "phone" },
+  { id: "escola", name: "Escola/Curso", icon: "book" },
+  { id: "outros", name: "Outros", icon: "file" },
+];
+export const billTypeOf = (b: Bill) => BILL_TYPES.find(t => t.id === b.type) || BILL_TYPES[BILL_TYPES.length - 1];
+
+// A conta/assinatura existe neste mês? (entre o primeiro e o último mês, quando informados)
+export const billActive = (b: Bill, month: string) => (!b.start || month >= b.start) && (!b.end || month <= b.end);
+// Valor do mês: o efetivo, se você informou ao pagar; senão, o previsto.
+export const billAmount = (b: Bill, month: string) => b.amounts?.[month] ?? b.amount;
+
 export type BillStatus = "paga" | "pendente" | "atrasada";
 export function billStatus(bill: Bill, month: string, today: string): BillStatus {
+  // Assinatura é cobrada sozinha: conta como paga em todo mês em que está ativa.
+  if (bill.kind === "assinatura") return "paga";
   if (bill.paid && bill.paid[month]) return "paga";
   const tm = ym(today);
   if (month < tm) return "atrasada";
@@ -227,9 +248,9 @@ export type InvoiceItem = { src: "tx" | "bill" | "parcel"; id: string; date: str
 export function invoiceItems(data: Data, card: CreditCard, month: string, today: string): InvoiceItem[] {
   const tx = data.txs.filter(x => x.method === card.id && x.kind !== "compartilhado" && invoiceMonth(card, x.date) === month)
     .map(x => ({ src: "tx" as const, id: x.id, date: x.date, desc: x.desc, amount: x.amount, categoryId: x.categoryId }));
-  const bills = [addMonths(month, -1), month, addMonths(month, 1)].flatMap(m => data.bills
-    .filter(b => b.method === card.id && billStatus(b, m, today) === "paga" && invoiceMonth(card, dateIn(m, b.day)) === month)
-    .map(b => ({ src: "bill" as const, id: b.id + m, date: dateIn(m, b.day), desc: b.name, amount: b.amount, categoryId: b.categoryId })));
+  const bills = [addMonths(month, -1), month, addMonths(month, 1)].flatMap(m => billsFor(data, m, today)
+    .filter(b => b.method === card.id && b.status === "paga" && invoiceMonth(card, b.date) === month)
+    .map(b => ({ src: "bill" as const, id: b.id + m, date: b.date, desc: b.name, amount: b.amount, categoryId: b.categoryId })));
   const parcels = data.installments.filter(i => i.cardId === card.id).flatMap(i => {
     const p = parcelInfo(i, month);
     return p.active ? [{ src: "parcel" as const, id: i.id, date: i.date || dateIn(month, card.closeDay), desc: i.desc + " " + p.idx + "/" + i.n, amount: i.amount, categoryId: i.categoryId }] : [];
@@ -257,7 +278,7 @@ export function thirdPartyFor(data: Data, month: string, today: string): ThirdPa
     const items = [
       ...data.cards.flatMap(k => invoiceItems(data, k, month, today).filter(i => i.categoryId === cat.id).map(i => ({ method: k.id, amount: i.amount }))),
       ...data.txs.filter(x => inMonth(x) && x.categoryId === cat.id && !cardIds.has(x.method)).map(x => ({ method: x.method, amount: x.amount })),
-      ...data.bills.filter(b => b.categoryId === cat.id && !cardIds.has(b.method) && billStatus(b, month, today) === "paga").map(b => ({ method: b.method, amount: b.amount })),
+      ...billsFor(data, month, today).filter(b => b.categoryId === cat.id && !cardIds.has(b.method) && b.status === "paga").map(b => ({ method: b.method, amount: b.amount })),
     ];
     const byMethod: Record<string, number> = {};
     items.forEach(i => { byMethod[i.method] = round2((byMethod[i.method] || 0) + i.amount); });
@@ -279,6 +300,11 @@ export function thirdPartyFor(data: Data, month: string, today: string): ThirdPa
 export type Expense = { src: "tx" | "parcel" | "bill"; id: string; date: string; desc: string; categoryId: string; amount: number; method: string; ref: Tx | (Installment & { idx: number }) | Bill };
 export type Budget = { cat: Category; limit: number; spent: number; pend: number; ratio: number; rest: number; state: BudgetState };
 export type MonthBill = Bill & { status: BillStatus; date: string };
+
+// Contas e assinaturas de um mês, com o valor e a situação daquele mês.
+export function billsFor(data: Data, month: string, today: string): MonthBill[] {
+  return data.bills.filter(b => billActive(b, month)).map(b => ({ ...b, amount: billAmount(b, month), status: billStatus(b, month, today), date: dateIn(month, b.day) }));
+}
 // Situação das faturas de um cartão no mês, já contando a caixinha dele.
 export type CardInvoiceStatus = { cardId: string; box: number; prevOpen: number; prevOwed: number; coveredPrev: number; cur: number; coveredCur: number; sobra: number };
 export type MonthCard = CreditCard & {
@@ -302,7 +328,7 @@ export function compute(data: Data, month: string, today: string) {
 
   const txs = data.txs.filter(inMonth);
   const parcels = data.installments.map(i => ({ ...i, ...parcelInfo(i, month) })).filter(i => i.active);
-  const bills: MonthBill[] = data.bills.map(b => ({ ...b, status: billStatus(b, month, today), date: dateIn(month, b.day) }));
+  const bills: MonthBill[] = billsFor(data, month, today);
   const closeDayOf = (cardId: string) => (data.cards.find(c => c.id === cardId) || { closeDay: 1 }).closeDay;
 
   const allExpenses: Expense[] = [

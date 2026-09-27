@@ -79,6 +79,8 @@ model Transaction {
   @@index([date])
 }
 
+// Conta fixa (kind "conta": marca como paga todo mês) ou assinatura (kind "assinatura":
+// cobrada sozinha todo mês entre start e end).
 model Bill {
   id         String   @id
   seq        Int      @default(autoincrement())
@@ -88,6 +90,14 @@ model Bill {
   categoryId String
   method     String
   paidMonths String[]
+  kind       String   @default("conta")
+  // Tipo da conta fixa: luz, agua, internet, aluguel...
+  type       String?
+  // Primeiro e último mês (AAAA-MM). Vazio = sem limite.
+  start      String?
+  end        String?
+  // Valor efetivo de cada mês quando difere do previsto: { "2026-09": 132.4 }.
+  amounts    Json     @default("{}")
 }
 
 model Card {

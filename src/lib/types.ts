@@ -2,7 +2,7 @@
 // Datas são sempre texto: dia "AAAA-MM-DD", mês "AAAA-MM".
 
 export type Tone = "neutral" | "primary" | "positive" | "warning" | "caution" | "negative";
-export type Route = "dashboard" | "transacoes" | "cartoes" | "caixinhas" | "orcamento" | "metas" | "calendario" | "receitas" | "config";
+export type Route = "dashboard" | "transacoes" | "cartoes" | "caixinhas" | "contas" | "orcamento" | "metas" | "calendario" | "receitas" | "config";
 export type CatColor = "chart1" | "chart2" | "chart3" | "chart4" | "chart5" | "chart6" | "other";
 export type CardColor = "nubank" | "mp";
 
@@ -13,7 +13,13 @@ export interface Tx {
 }
 export interface Source { id: string; name: string; icon: string; expected: number; days: number[]; kind: "fixa" | "variavel"; freq: "mensal" | "quinzenal" | "eventual" }
 export interface Income { id: string; sourceId: string; date: string; amount: number; note: string }
-export interface Bill { id: string; name: string; amount: number; day: number; categoryId: string; method: string; paid: Record<string, boolean> }
+// kind "conta": conta fixa, marcada como paga mês a mês (amounts guarda o valor efetivo de cada mês).
+// kind "assinatura": cobrada sozinha todo mês entre start e end (meses AAAA-MM; vazio = sem limite).
+export type BillKind = "conta" | "assinatura";
+export interface Bill {
+  id: string; name: string; amount: number; day: number; categoryId: string; method: string; paid: Record<string, boolean>;
+  kind?: BillKind; type?: string; start?: string; end?: string; amounts?: Record<string, number>;
+}
 export interface CreditCard { id: string; name: string; limit: number; closeDay: number; dueDay: number; color: CardColor }
 // fromBox = parte paga com a caixinha do cartão (não sai do saldo da conta).
 export interface CardPayment { id: string; cardId: string; date: string; amount: number; fromBox?: number }

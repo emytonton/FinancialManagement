@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { addMonths, cx, dateIn, dayOf, ddmm, fmt, monthName, pct, round2, uid, ym } from "@/lib/format";
-import { installmentStart, invoiceMonth, parcelInfo } from "@/lib/finance";
+import { BILL_TYPES, installmentStart, invoiceMonth, parcelInfo } from "@/lib/finance";
 import type { Collection, Data, Installment } from "@/lib/types";
 import { Button, CatIcon, Field, Icon, Input, MoneyInput, Notice, Segmented, Select, Sheet, Toggle } from "../ui";
 import { useApp, type AddState, type AddTab, type FormKind } from "./store";
@@ -92,12 +92,25 @@ const FORMS: Record<FormKind, FormDef> = {
       return { ...o, days: o.freq === "eventual" ? [] : days };
     } },
   bill: { title: "Conta fixa", coll: "bills", fields: [
-    { key: "name", label: "Nome", required: true, placeholder: "Ex.: Internet" },
-    { key: "amount", label: "Valor", type: "money", required: true, half: true },
+    { key: "name", label: "Nome", required: true, placeholder: "Ex.: Enel, Sanasa" },
+    { key: "type", label: "Tipo", type: "select", options: BILL_TYPES.map(t => ({ value: t.id, label: t.name })) },
+    { key: "amount", label: "Valor previsto", type: "money", required: true, half: true, hint: "Ao marcar como paga, você ajusta o valor do mês." },
     { key: "day", label: "Vence todo dia", type: "number", min: 1, max: 31, half: true, required: true },
     { key: "categoryId", label: "Categoria", type: "select", half: true },
-    { key: "method", label: "Paga com", type: "select", half: true }],
-    blank: d => ({ id: uid(), name: "", amount: 0, day: 10, categoryId: d.categories.find(c => c.id === "casa")?.id || d.categories[0]?.id || "", method: "pix", paid: {} }) },
+    { key: "method", label: "Paga com", type: "select", half: true },
+    { key: "start", label: "Começa em", type: "month", half: true, hint: "Antes desse mês ela não aparece." }],
+    blank: (d, month) => ({ id: uid(), name: "", kind: "conta", type: "luz", amount: 0, day: 10, categoryId: d.categories.find(c => c.id === "casa")?.id || d.categories[0]?.id || "", method: "pix", paid: {}, amounts: {}, start: month }),
+    save: v => ({ ...v, kind: "conta" }) },
+  subscription: { title: "Assinatura", coll: "bills", fields: [
+    { key: "name", label: "Nome", required: true, placeholder: "Ex.: Spotify, Netflix" },
+    { key: "amount", label: "Valor por mês", type: "money", required: true, half: true },
+    { key: "day", label: "Dia da cobrança", type: "number", min: 1, max: 31, half: true, required: true },
+    { key: "method", label: "Cobrada em", type: "select", half: true },
+    { key: "categoryId", label: "Categoria", type: "select", half: true },
+    { key: "start", label: "Primeira cobrança", type: "month", half: true, required: true },
+    { key: "end", label: "Última cobrança", type: "month", half: true, hint: "Deixe vazio enquanto estiver ativa. Ao cancelar, coloque o último mês cobrado." }],
+    blank: (d, month) => ({ id: uid(), name: "", kind: "assinatura", amount: 0, day: 10, method: d.cards[0]?.id || "pix", categoryId: d.categories.find(c => c.id === "assin")?.id || d.categories[0]?.id || "", paid: {}, amounts: {}, start: month, end: "" }),
+    save: v => ({ ...v, kind: "assinatura" }) },
   card: { title: "Cartão", coll: "cards", fields: [
     { key: "name", label: "Nome", required: true, placeholder: "Ex.: Nubank" },
     { key: "limit", label: "Limite", type: "money", required: true },
@@ -154,7 +167,8 @@ export function FormHost() {
   const app = useApp();
   const { form, data } = app;
   if (!form) return null;
-  const def = FORMS[form.kind];
+  // Uma assinatura aberta de qualquer lugar (Calendário, Transações) usa o formulário de assinatura.
+  const def = FORMS[form.kind === "bill" && form.item?.kind === "assinatura" ? "subscription" : form.kind];
   const fields = def.fields.map(x => {
     if (x.key === "categoryId") return { ...x, options: data.categories.map(c => ({ value: c.id, label: c.name })) };
     if (x.key === "sourceId") return { ...x, options: data.sources.map(s => ({ value: s.id, label: s.name })) };
@@ -236,7 +250,7 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
         app.upsert("installments", inst);
         app.toast(endedMsg(data, inst, app.month) || "Compra parcelada em " + v.n + "x adicionada");
       } else if (v.kind === "fixa" && !edit) {
-        app.upsert("bills", { id: uid(), name: v.desc || "Conta fixa", amount: v.amount, day: dayOf(v.date), categoryId: v.categoryId, method: v.method, paid: { [ym(v.date)]: true } });
+        app.upsert("bills", { id: uid(), name: v.desc || "Conta fixa", amount: v.amount, day: dayOf(v.date), categoryId: v.categoryId, method: v.method, paid: { [ym(v.date)]: true }, kind: "conta", type: "outros", start: ym(v.date), amounts: {} });
         app.toast("Despesa fixa criada e marcada como paga neste mês");
       } else {
         const shared = v.kind === "compartilhado";

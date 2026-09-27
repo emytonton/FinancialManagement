@@ -38,6 +38,11 @@ Dinheiro separado fora do saldo da conta (como as caixinhas do Mercado Pago). Ca
 - **Ligada a um cartão** (ex.: Cartão Nubank): o valor abate da fatura desse cartão. Primeiro cobre a fatura anterior ainda aberta, depois a atual. Fatura − caixinha = restante a pagar, e só o restante sai do "livre para gastar". Ao marcar **Paguei**, o app usa primeiro a caixinha (e tira o valor dela) e o resto sai da conta.
 - **Sem cartão** (ex.: Reserva, Academia): só aparece como dinheiro reservado; não mexe no livre nem nas faturas.
 
+## Assinaturas e contas fixas
+
+- **Assinatura:** valor, dia da cobrança, forma de pagamento e mês da primeira cobrança (e da última, ao cancelar). Entra sozinha todo mês: na fatura do cartão (respeitando o fechamento) ou saindo da conta.
+- **Conta fixa:** tipo (Luz, Água, Internet...), valor previsto e vencimento. Ao tocar em **Paguei**, você confirma ou ajusta o valor daquele mês; os outros meses continuam com o previsto.
+
 ## Rodando localmente
 
 Precisa de Node 20+.

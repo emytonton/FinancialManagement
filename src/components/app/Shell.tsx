@@ -12,6 +12,7 @@ const NAV: { id: Route; label: string; icon: string }[] = [
   { id: "transacoes", label: "Transações", icon: "list" },
   { id: "cartoes", label: "Cartões", icon: "card" },
   { id: "caixinhas", label: "Caixinhas", icon: "piggy" },
+  { id: "contas", label: "Assinaturas e contas", icon: "repeat" },
   { id: "orcamento", label: "Orçamento", icon: "pie" },
   { id: "metas", label: "Metas", icon: "target" },
   { id: "calendario", label: "Calendário", icon: "calendar" },

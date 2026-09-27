@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { addMonths, cx, dateIn, ddmm, monthLabel, sum, weekday, ym } from "@/lib/format";
-import { parcelInfo } from "@/lib/finance";
+import { billsFor, parcelInfo } from "@/lib/finance";
 import type { Category, Tx } from "@/lib/types";
 import { Button, Card, CatIcon, EmptyState, Icon, Money, Segmented, Select, TransactionRow, type RowTx } from "../ui";
 import { useApp } from "../app/store";
@@ -43,8 +43,8 @@ export function Transactions({ dir: initialDir, flag: initialFlag }: { dir?: str
       const card = data.cards.find(k => k.id === i.cardId);
       if (p.active) items.push({ key: "p" + i.id + m, date: dateIn(m, card?.closeDay || 1), parcel: true, tx: { desc: i.desc, amount: i.amount, method: i.cardId, installment: p.idx + "/" + i.n }, cat: catOf(i.categoryId), edit: () => app.openForm("installment", i) });
     });
-    data.bills.forEach(b => {
-      if (b.paid && b.paid[m]) items.push({ key: "b" + b.id + m, date: dateIn(m, b.day), tx: { desc: b.name, amount: b.amount, method: b.method, installment: "fixa" }, cat: catOf(b.categoryId), edit: () => app.openForm("bill", b) });
+    billsFor(data, m, c.today).forEach(b => {
+      if (b.status === "paga") items.push({ key: "b" + b.id + m, date: b.date, tx: { desc: b.name, amount: b.amount, method: b.method, installment: b.kind === "assinatura" ? "assinatura" : "fixa" }, cat: catOf(b.categoryId), edit: () => app.openForm(b.kind === "assinatura" ? "subscription" : "bill", data.bills.find(x => x.id === b.id)) });
     });
   });
   items = items.filter(it => {

@@ -52,10 +52,15 @@ const tables = {
   },
   bills: {
     model: (db: Client) => db.bill,
-    toDb: ({ paid, ...x }: Input<"bills">) => ({ ...x, paidMonths: Object.keys(paid).filter(m => paid[m]).sort() }),
+    toDb: ({ paid, ...x }: Input<"bills">) => ({
+      ...x, paidMonths: Object.keys(paid).filter(m => paid[m]).sort(),
+      type: x.type || null, start: x.start || null, end: x.end || null,
+    }),
     fromDb: (r: any) => ({
       id: r.id, name: r.name, amount: num(r.amount), day: r.day, categoryId: r.categoryId, method: r.method,
       paid: Object.fromEntries((r.paidMonths as string[]).map(m => [m, true])),
+      kind: r.kind, amounts: r.amounts ?? {},
+      ...(r.type ? { type: r.type } : {}), ...(r.start ? { start: r.start } : {}), ...(r.end ? { end: r.end } : {}),
     }),
   },
   cards: {

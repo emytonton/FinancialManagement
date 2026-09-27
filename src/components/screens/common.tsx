@@ -1,7 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { addMonths, dateIn, round2 } from "@/lib/format";
-import type { Month, BillStatus } from "@/lib/finance";
+import { billsFor, type Month, type BillStatus } from "@/lib/finance";
 import type { Data } from "@/lib/types";
 
 export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
@@ -29,7 +29,8 @@ export function upcomingFor(data: Data, c: Month, limit = 99): Upcoming[] {
   c.reembolsos.forEach(x => ev.push({ date: c.today, label: "Reembolso: " + x.desc, amount: x.amount, type: "refund" }));
   const nm = addMonths(c.month, 1);
   data.sources.forEach(s => s.days.forEach(d => ev.push({ date: dateIn(nm, d), label: s.name, amount: round2(s.expected / s.days.length), type: "income" })));
-  data.bills.forEach(b => ev.push({ date: dateIn(nm, b.day), label: b.name, amount: b.amount, type: "bill" }));
+  // Mês que vem: só contas a pagar (assinaturas são cobradas sozinhas no cartão).
+  billsFor(data, nm, c.today).filter(b => b.kind !== "assinatura").forEach(b => ev.push({ date: b.date, label: b.name, amount: b.amount, type: "bill" }));
   return ev
     .filter(e => e.status === "atrasada" || e.date >= c.today)
     .sort((a, z) => a.date.localeCompare(z.date) || (a.type === "income" ? -1 : 1))
