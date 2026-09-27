@@ -6,7 +6,7 @@ export type Route = "dashboard" | "transacoes" | "cartoes" | "orcamento" | "meta
 export type CatColor = "chart1" | "chart2" | "chart3" | "chart4" | "chart5" | "chart6" | "other";
 export type CardColor = "nubank" | "mp";
 
-export interface Category { id: string; name: string; icon: string; color: CatColor; mode: "fixo" | "pct"; limit: number; pct: number }
+export interface Category { id: string; name: string; icon: string; color: CatColor; mode: "fixo" | "pct"; limit: number; pct: number; thirdParty?: boolean }
 export interface Tx {
   id: string; date: string; desc: string; categoryId: string; method: string; amount: number;
   kind: "pessoal" | "compartilhado"; total?: number; paidBy?: string; status?: "pendente" | "reembolsado";
@@ -19,6 +19,8 @@ export interface CardPayment { id: string; cardId: string; date: string; amount:
 export interface Installment { id: string; desc: string; cardId: string; categoryId: string; amount: number; n: number; start: string }
 export interface Goal { id: string; name: string; icon: string; target: number; base: number; deadline: string; monthly: number }
 export interface Contribution { id: string; goalId: string; date: string; amount: number }
+// Dinheiro que quem usa uma categoria de terceiro (Mãe, Pai) te devolveu; month = mês dos gastos cobertos.
+export interface PersonPayment { id: string; categoryId: string; month: string; date: string; amount: number }
 export interface HistoryRow { m: string; receitas: number; gastos: number; guardado?: number }
 
 export interface Settings {
@@ -31,9 +33,9 @@ export interface Data {
   carry: Record<string, number>;
   categories: Category[]; sources: Source[]; incomes: Income[]; txs: Tx[]; bills: Bill[];
   cards: CreditCard[]; cardPayments: CardPayment[]; installments: Installment[];
-  goals: Goal[]; contributions: Contribution[]; history: HistoryRow[];
+  goals: Goal[]; contributions: Contribution[]; personPayments: PersonPayment[]; history: HistoryRow[];
 }
 
-export type Collection = "categories" | "sources" | "incomes" | "txs" | "bills" | "cards" | "cardPayments" | "installments" | "goals" | "contributions";
+export type Collection = "categories" | "sources" | "incomes" | "txs" | "bills" | "cards" | "cardPayments" | "installments" | "goals" | "contributions" | "personPayments";
 
 export type ItemOf<C extends Collection> = Data[C][number];

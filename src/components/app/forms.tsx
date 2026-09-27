@@ -49,7 +49,7 @@ function EntityForm({ title, fields, value, onSave, onDelete, onClose, saveLabel
     </>}>
       <div className="b-form">
         {fields.filter(f => !f.show || f.show(v)).map(f => f.type === "toggle"
-          ? <div key={f.key} className="b-field">{input(f)}</div>
+          ? <div key={f.key} className="b-field">{input(f)}{f.hint ? <span className="b-field-hint">{typeof f.hint === "function" ? f.hint(v) : f.hint}</span> : null}</div>
           : <Field key={f.key} label={f.label} hint={typeof f.hint === "function" ? f.hint(v) : f.hint} error={err[f.key]} className={f.half ? "is-half" : undefined}>{input(f)}</Field>)}
       </div>
     </Sheet>
@@ -67,13 +67,15 @@ type FormDef = { title: string; coll: Collection; fields: FieldDef[]; blank?: (d
 const FORMS: Record<FormKind, FormDef> = {
   category: { title: "Categoria", coll: "categories", fields: [
     { key: "name", label: "Nome", required: true },
-    { key: "mode", label: "Limite mensal", type: "seg", options: [{ value: "fixo", label: "Valor fixo" }, { value: "pct", label: "% da renda do mês" }] },
-    { key: "limit", label: "Limite em R$", type: "money", show: v => v.mode !== "pct" },
-    { key: "pct", label: "Percentual da renda", type: "number", min: 0, max: 100, show: v => v.mode === "pct", hint: "Recalculado com base em tudo que entrou no mês." },
+    { key: "thirdParty", label: "Gasto de outra pessoa", type: "toggle", toggleLabel: "Gasto de outra pessoa",
+      hint: "Para quem usa seu cartão e te devolve (ex.: Mãe, Pai). Fica fora dos seus gastos e do orçamento e aparece em Cartões como valor a cobrar." },
+    { key: "mode", label: "Limite mensal", type: "seg", options: [{ value: "fixo", label: "Valor fixo" }, { value: "pct", label: "% da renda do mês" }], show: v => !v.thirdParty },
+    { key: "limit", label: "Limite em R$", type: "money", show: v => !v.thirdParty && v.mode !== "pct" },
+    { key: "pct", label: "Percentual da renda", type: "number", min: 0, max: 100, show: v => !v.thirdParty && v.mode === "pct", hint: "Recalculado com base em tudo que entrou no mês." },
     { key: "icon", label: "Ícone", type: "select", options: ICON_OPTIONS, half: true },
     { key: "color", label: "Cor no gráfico", type: "select", options: COLOR_OPTIONS, half: true }],
-    blank: () => ({ id: uid(), name: "", mode: "fixo", limit: 0, pct: 5, icon: "box", color: "other" }),
-    save: v => ({ ...v, limit: Number(v.limit) || 0, pct: Number(v.pct) || 0 }) },
+    blank: () => ({ id: uid(), name: "", mode: "fixo", limit: 0, pct: 5, icon: "box", color: "other", thirdParty: false }),
+    save: v => ({ ...v, limit: Number(v.limit) || 0, pct: Number(v.pct) || 0, thirdParty: !!v.thirdParty }) },
   source: { title: "Fonte de renda", coll: "sources", fields: [
     { key: "name", label: "Nome", required: true, placeholder: "Ex.: Emprego 1" },
     { key: "expected", label: "Valor previsto no mês", type: "money", hint: "Só uma referência. O que conta é o valor que você registrar como recebido." },
@@ -123,6 +125,10 @@ const FORMS: Record<FormKind, FormDef> = {
     { key: "sourceId", label: "Fonte", type: "select", half: true },
     { key: "date", label: "Data", type: "date", half: true, required: true },
     { key: "note", label: "Observação" }] },
+  personPayment: { title: "Valor recebido", coll: "personPayments", fields: [
+    { key: "amount", label: "Quanto recebeu", type: "money", required: true },
+    { key: "date", label: "Data", type: "date", required: true }],
+    blank: (_d, month, today) => ({ id: uid(), categoryId: "", month, date: today, amount: 0 }) },
   contribution: { title: "Aporte", coll: "contributions", fields: [
     { key: "amount", label: "Valor guardado", type: "money", required: true },
     { key: "goalId", label: "Meta", type: "select", half: true },
@@ -142,7 +148,7 @@ export function FormHost() {
     if (x.key === "method") return { ...x, options: app.methods.map(m => ({ value: m.id, label: m.name })) };
     return x;
   });
-  const value = form.item ? (def.load ? def.load(form.item) : form.item) : def.blank ? def.blank(data, app.month, app.today) : { id: uid() };
+  const value = form.item ? (def.load ? def.load(form.item) : form.item) : { ...(def.blank ? def.blank(data, app.month, app.today) : { id: uid() }), ...form.preset };
   const close = () => app.setForm(null);
   return (
     <EntityForm key={String(value.id)} title={(form.item ? "Editar " : "Nova ") + def.title.toLowerCase()} fields={fields} value={value} onClose={close}

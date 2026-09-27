@@ -61,7 +61,8 @@ export function Transactions({ dir: initialDir, flag: initialFlag }: { dir?: str
   const groups: { date: string; items: Item[] }[] = [];
   items.forEach(it => { const g = groups[groups.length - 1]; if (g && g.date === it.date) g.items.push(it); else groups.push({ date: it.date, items: [it] }); });
   const tin = sum(items.filter(i => i.income), i => i.tx.amount);
-  const tout = sum(items.filter(i => !i.income), i => i.tx.amount);
+  // Gastos de outras pessoas só somam nas saídas quando você filtra pela categoria delas.
+  const tout = sum(items.filter(i => !i.income && (!i.cat?.thirdParty || cat === i.cat.id)), i => i.tx.amount);
   const pend = data.txs.filter(x => x.kind === "compartilhado" && x.status === "pendente");
   const markRefunded = (x: Tx) => { app.upsert("txs", { ...x, status: "reembolsado" }); app.toast("Marcado como reembolsado"); };
   const clear = () => { setQ(""); setDir("todas"); setCat(""); setMethod(""); setFlag(""); };

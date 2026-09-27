@@ -2,7 +2,7 @@ import "server-only";
 import type { z } from "zod";
 import { prisma } from "./db";
 import type { Prisma } from "@/generated/prisma/client";
-import type { CollectionName, schemas, dataSchema } from "./schemas";
+import { dataSchema, type CollectionName, type schemas } from "./schemas";
 import type { Data, Settings } from "@/lib/types";
 import { emptyData } from "@/lib/finance";
 
@@ -24,7 +24,7 @@ const tables = {
   categories: {
     model: (db: Client) => db.category,
     toDb: (x: Input<"categories">) => x,
-    fromDb: (r: any) => ({ id: r.id, name: r.name, icon: r.icon, color: r.color, mode: r.mode, limit: num(r.limit), pct: num(r.pct) }),
+    fromDb: (r: any) => ({ id: r.id, name: r.name, icon: r.icon, color: r.color, mode: r.mode, limit: num(r.limit), pct: num(r.pct), thirdParty: r.thirdParty }),
   },
   sources: {
     model: (db: Client) => db.source,
@@ -82,6 +82,11 @@ const tables = {
     model: (db: Client) => db.contribution,
     toDb: (x: Input<"contributions">) => ({ ...x, date: fromDay(x.date) }),
     fromDb: (r: any) => ({ id: r.id, goalId: r.goalId, date: toDay(r.date), amount: num(r.amount) }),
+  },
+  personPayments: {
+    model: (db: Client) => db.personPayment,
+    toDb: (x: Input<"personPayments">) => ({ ...x, date: fromDay(x.date) }),
+    fromDb: (r: any) => ({ id: r.id, categoryId: r.categoryId, month: r.month, date: toDay(r.date), amount: num(r.amount) }),
   },
 } as const;
 
@@ -142,7 +147,7 @@ export async function loadData(): Promise<Data> {
 // Primeiro acesso: banco vazio ganha as categorias padrão.
 export async function loadOrInit(): Promise<Data> {
   const exists = await prisma.settings.findUnique({ where: { id: 1 }, select: { id: true } });
-  if (!exists) await replaceData(emptyData());
+  if (!exists) await replaceData(dataSchema.parse(emptyData()));
   return loadData();
 }
 

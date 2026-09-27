@@ -1,6 +1,6 @@
 // Toda a matemática do Bolso. Funções puras: recebem os dados e o mês,
 // devolvem os números. Rodam no navegador (telas) e no servidor (dados iniciais).
-import type { Bill, Category, CreditCard, Data, Goal, Installment, Source, Tone, Tx, Income, Contribution, CardPayment } from "./types";
+import type { Bill, Category, CreditCard, Data, Goal, Installment, Source, Tone, Tx, Income, Contribution, CardPayment, PersonPayment } from "./types";
 import { MONTHS, addMonths, dateIn, dayOf, dim, fmt, monthDiff, pct, round2, sum, uid, ym } from "./format";
 
 export const BASE_METHODS = [
@@ -46,7 +46,11 @@ export function mockData(): Data {
     version: 1,
     settings: { name: "Emy", savePct: 30, theme: "auto", lock: false, demo: true, demoToday: "2026-09-26" },
     carry: { "2026-08": 1310, "2026-09": 1520 },
-    categories: DEFAULT_CATEGORIES.map(c => ({ ...c })),
+    categories: [
+      ...DEFAULT_CATEGORIES.map(c => ({ ...c })),
+      { id: "mae", name: "Mãe", icon: "heart", color: "other", mode: "fixo", limit: 0, pct: 0, thirdParty: true },
+      { id: "pai", name: "Pai", icon: "users", color: "other", mode: "fixo", limit: 0, pct: 0, thirdParty: true },
+    ],
     sources: [
       { id: "job1", name: "Emprego 1", icon: "briefcase", expected: 2300, days: [5], kind: "fixa", freq: "mensal" },
       { id: "job2", name: "Emprego 2", icon: "laptop", expected: 1240, days: [15, 28], kind: "variavel", freq: "quinzenal" },
@@ -97,6 +101,11 @@ export function mockData(): Data {
       shared("2026-09-24", "Mercado", "merc", 180, 72, "pendente"),
       shared("2026-09-25", "Restaurante", "alim", 70, 35, "pendente"),
       t("2026-09-26", "Lanche", "alim", "debito", 19.9),
+      t("2026-08-18", "Farmácia", "mae", "nubank", 86.4),
+      t("2026-08-25", "Posto", "pai", "mp", 150),
+      t("2026-09-06", "Supermercado", "mae", "nubank", 212.3),
+      t("2026-09-19", "Farmácia", "mae", "nubank", 64.8),
+      t("2026-09-12", "Posto", "pai", "mp", 180),
     ],
     bills: [
       { id: "b1", name: "Spotify", amount: 21.9, day: 8, categoryId: "assin", method: "nubank", paid: { "2026-08": true, "2026-09": true } },
@@ -132,6 +141,10 @@ export function mockData(): Data {
       { id: uid(), goalId: "g1", date: "2026-09-07", amount: 500 },
       { id: uid(), goalId: "g2", date: "2026-09-11", amount: 100 },
     ],
+    personPayments: [
+      { id: uid(), categoryId: "mae", month: "2026-08", date: "2026-09-09", amount: 86.4 },
+      { id: uid(), categoryId: "pai", month: "2026-08", date: "2026-09-10", amount: 150 },
+    ],
     history: [
       { m: "2026-04", receitas: 3620, gastos: 2980, guardado: 380 },
       { m: "2026-05", receitas: 3710, gastos: 2870, guardado: 520 },
@@ -146,7 +159,7 @@ export function emptyData(prev?: Data): Data {
   const settings = prev ? { ...prev.settings, demo: false } : { name: "", savePct: 30, theme: "auto" as const, lock: false, demo: false, demoToday: "2026-09-26" };
   return {
     version: 1, settings, carry: {}, categories: DEFAULT_CATEGORIES.map(c => ({ ...c })),
-    sources: [], incomes: [], txs: [], bills: [], cards: [], cardPayments: [], installments: [], goals: [], contributions: [], history: [],
+    sources: [], incomes: [], txs: [], bills: [], cards: [], cardPayments: [], installments: [], goals: [], contributions: [], personPayments: [], history: [],
   };
 }
 
@@ -178,19 +191,49 @@ export function billStatus(bill: Bill, month: string, today: string): BillStatus
 
 // Fatura de um cartão num mês: compras no cartão, contas fixas pagas nele e parcelas.
 // Mesma regra de compute(), sem recursão, para poder olhar o mês anterior.
-export function cardInvoice(data: Data, card: CreditCard, month: string, today: string) {
+// Com onlyMine, deixa de fora o que foi gasto nas categorias de outras pessoas (Mãe, Pai).
+export function cardInvoice(data: Data, card: CreditCard, month: string, today: string, onlyMine = false) {
   const inMonth = (x: { date: string }) => ym(x.date) === month;
-  const tx = data.txs.filter(x => inMonth(x) && x.method === card.id && x.kind !== "compartilhado");
-  const bills = data.bills.filter(b => b.method === card.id && billStatus(b, month, today) === "paga");
-  const parcels = data.installments.filter(i => i.cardId === card.id && parcelInfo(i, month).active);
+  const third = thirdIdsOf(data);
+  const keep = (categoryId: string) => !onlyMine || !third.has(categoryId);
+  const tx = data.txs.filter(x => inMonth(x) && x.method === card.id && x.kind !== "compartilhado" && keep(x.categoryId));
+  const bills = data.bills.filter(b => b.method === card.id && billStatus(b, month, today) === "paga" && keep(b.categoryId));
+  const parcels = data.installments.filter(i => i.cardId === card.id && parcelInfo(i, month).active && keep(i.categoryId));
   return round2(sum(tx, x => x.amount) + sum(bills, b => b.amount) + sum(parcels, p => p.amount));
+}
+
+// Categorias de outra pessoa: o gasto passa pelo seu cartão/conta, mas quem paga é ela.
+export const thirdIdsOf = (data: Data) => new Set(data.categories.filter(c => c.thirdParty).map(c => c.id));
+
+export type ThirdParty = { cat: Category; spent: number; onCards: number; owedOnCards: number; byMethod: Record<string, number>; received: number; falta: number; payments: PersonPayment[] };
+
+// Quanto cada pessoa gastou no mês (em qualquer forma de pagamento) e quanto já te devolveu.
+export function thirdPartyFor(data: Data, month: string, today: string): ThirdParty[] {
+  const inMonth = (x: { date: string }) => ym(x.date) === month;
+  return data.categories.filter(c => c.thirdParty).map(cat => {
+    const items = [
+      ...data.txs.filter(x => inMonth(x) && x.categoryId === cat.id).map(x => ({ method: x.method, amount: x.amount })),
+      ...data.installments.filter(i => i.categoryId === cat.id && parcelInfo(i, month).active).map(i => ({ method: i.cardId, amount: i.amount })),
+      ...data.bills.filter(b => b.categoryId === cat.id && billStatus(b, month, today) === "paga").map(b => ({ method: b.method, amount: b.amount })),
+    ];
+    const byMethod: Record<string, number> = {};
+    items.forEach(i => { byMethod[i.method] = round2((byMethod[i.method] || 0) + i.amount); });
+    const spent = round2(sum(items, i => i.amount));
+    const payments = data.personPayments.filter(p => p.categoryId === cat.id && p.month === month);
+    const received = round2(sum(payments, p => p.amount));
+    const falta = round2(Math.max(0, spent - received));
+    const cards = cardIdsOf(data);
+    const onCards = round2(sum(Object.entries(byMethod).filter(([m]) => cards.has(m)), ([, v]) => v));
+    // Parte da fatura que a pessoa ainda não te devolveu (o que ela já devolveu fica reservado para pagar o cartão).
+    return { cat, spent, onCards, owedOnCards: round2(Math.min(falta, onCards)), byMethod, received, falta, payments };
+  });
 }
 
 export type Expense = { src: "tx" | "parcel" | "bill"; id: string; date: string; desc: string; categoryId: string; amount: number; method: string; ref: Tx | (Installment & { idx: number }) | Bill };
 export type Budget = { cat: Category; limit: number; spent: number; pend: number; ratio: number; rest: number; state: BudgetState };
 export type MonthBill = Bill & { status: BillStatus; date: string };
 export type MonthCard = CreditCard & {
-  fatura: number; futuro: number; usado: number; disponivel: number; ratio: number; due: string;
+  fatura: number; faturaMinha: number; faturaTerceiros: number; futuro: number; usado: number; disponivel: number; ratio: number; due: string;
   items: { date: string; desc: string; amount: number; categoryId: string }[];
 };
 export type Expected = { source: Source; date: string; amount: number };
@@ -204,17 +247,21 @@ export function compute(data: Data, month: string, today: string) {
   const receitas = round2(sum(incomes, i => i.amount));
   const carry = (data.carry && data.carry[month]) || 0;
   const catById = Object.fromEntries(data.categories.map(c => [c.id, c]));
+  const third = thirdIdsOf(data);
+  const mine = (categoryId: string) => !third.has(categoryId);
 
   const txs = data.txs.filter(inMonth);
   const parcels = data.installments.map(i => ({ ...i, ...parcelInfo(i, month) })).filter(i => i.active);
   const bills: MonthBill[] = data.bills.map(b => ({ ...b, status: billStatus(b, month, today), date: dateIn(month, b.day) }));
   const closeDayOf = (cardId: string) => (data.cards.find(c => c.id === cardId) || { closeDay: 1 }).closeDay;
 
-  const expenses: Expense[] = [
+  const allExpenses: Expense[] = [
     ...txs.map(x => ({ src: "tx" as const, id: x.id, date: x.date, desc: x.desc, categoryId: x.categoryId, amount: x.amount, method: x.method, ref: x })),
     ...parcels.map(p => ({ src: "parcel" as const, id: p.id, date: dateIn(month, closeDayOf(p.cardId)), desc: p.desc + " " + p.idx + "/" + p.n, categoryId: p.categoryId, amount: p.amount, method: p.cardId, ref: p })),
     ...bills.filter(b => b.status === "paga").map(b => ({ src: "bill" as const, id: b.id, date: b.date, desc: b.name, categoryId: b.categoryId, amount: b.amount, method: b.method, ref: b })),
   ];
+  // Gastos de outras pessoas ficam fora de todas as métricas (gastos, orçamento, gráficos, insights).
+  const expenses = allExpenses.filter(e => mine(e.categoryId));
   const gastos = round2(sum(expenses, e => e.amount));
 
   const byCat: Record<string, number> = {};
@@ -230,6 +277,7 @@ export function compute(data: Data, month: string, today: string) {
     const fromBills = bills.filter(b => b.method === c.id && b.status === "paga");
     const fromParcels = parcels.filter(p => p.cardId === c.id);
     const fatura = round2(sum(fromTx, x => x.amount) + sum(fromBills, b => b.amount) + sum(fromParcels, p => p.amount));
+    const faturaTerceiros = round2(sum(fromTx.filter(x => !mine(x.categoryId)), x => x.amount) + sum(fromBills.filter(b => !mine(b.categoryId)), b => b.amount) + sum(fromParcels.filter(p => !mine(p.categoryId)), p => p.amount));
     const futuro = round2(sum(data.installments.filter(i => i.cardId === c.id), i => { const pi = parcelInfo(i, month); return pi.idx < 1 ? i.n * i.amount : pi.remaining * i.amount; }));
     const usado = round2(fatura + futuro);
     const due = dateIn(addMonths(month, 1), c.dueDay);
@@ -238,13 +286,22 @@ export function compute(data: Data, month: string, today: string) {
       ...fromBills.map(b => ({ date: b.date, desc: b.name, amount: b.amount, categoryId: b.categoryId })),
       ...fromParcels.map(p => ({ date: dateIn(month, c.closeDay), desc: p.desc + " " + p.idx + "/" + p.n, amount: p.amount, categoryId: p.categoryId })),
     ].sort((a, b) => b.date.localeCompare(a.date));
-    return { ...c, fatura, futuro, usado, disponivel: round2(c.limit - usado), ratio: c.limit ? usado / c.limit : 0, due, items };
+    return { ...c, fatura, faturaMinha: round2(fatura - faturaTerceiros), faturaTerceiros, futuro, usado, disponivel: round2(c.limit - usado), ratio: c.limit ? usado / c.limit : 0, due, items };
   });
-  const faturas = round2(sum(cards, c => c.fatura));
+  // faturas = só a sua parte; faturasTotal = o valor real que vem na fatura.
+  const faturas = round2(sum(cards, c => c.faturaMinha));
+  const faturasTotal = round2(sum(cards, c => c.fatura));
   const cardPaid: CardPayment[] = data.cardPayments.filter(inMonth);
   // Fatura do mês anterior vence neste mês; o que ainda não foi pago também tem dono.
   const prevMonth = addMonths(month, -1);
-  const faturasAbertas = round2(sum(data.cards, k => Math.max(0, cardInvoice(data, k, prevMonth, today) - sum(cardPaid.filter(p => p.cardId === k.id), p => p.amount))));
+  // Dinheiro que Mãe/Pai te devolveram neste mês: entra na conta, mas não é receita.
+  const personReceived = data.personPayments.filter(inMonth);
+  const terceiros = thirdPartyFor(data, month, today);
+  // Reservado para as faturas = valor real menos o que outras pessoas ainda te devem.
+  // Antes delas pagarem, sobra só a sua parte; quando pagam, o dinheiro delas entra na conta e fica reservado aqui.
+  const faturasReservadas = round2(faturasTotal - sum(terceiros, t => t.owedOnCards));
+  const prevOwed = sum(thirdPartyFor(data, prevMonth, today), t => t.owedOnCards);
+  const faturasAbertas = round2(Math.max(0, sum(data.cards, k => cardInvoice(data, k, prevMonth, today)) - sum(cardPaid, p => p.amount) - prevOwed));
 
   const contribs: Contribution[] = data.contributions.filter(inMonth);
   const guardado = round2(sum(contribs, c => c.amount));
@@ -254,14 +311,14 @@ export function compute(data: Data, month: string, today: string) {
   const cashOutTx = txs.filter(x => !isCard(x.method) && !(x.kind === "compartilhado" && x.status === "pendente"));
   const cashOutBills = bills.filter(b => b.status === "paga" && !isCard(b.method));
   const saidas = round2(sum(cashOutTx, x => x.amount) + sum(cashOutBills, b => b.amount) + guardado + sum(cardPaid, p => p.amount));
-  const emConta = round2(carry + receitas - saidas);
-  const livre = round2(emConta - faturas - faturasAbertas - contasAVencer - sum(reembolsos, x => x.amount) - faltaGuardar);
+  const emConta = round2(carry + receitas + sum(personReceived, p => p.amount) - saidas);
+  const livre = round2(emConta - faturasReservadas - faturasAbertas - contasAVencer - sum(reembolsos, x => x.amount) - faltaGuardar);
 
   const days = dim(month);
   const daysLeft = month === tm ? days - dayOf(today) + 1 : month > tm ? days : 0;
   const porDia = daysLeft > 0 ? round2(Math.max(0, livre) / daysLeft) : 0;
 
-  const budgets: Budget[] = data.categories.map(c => {
+  const budgets: Budget[] = data.categories.filter(c => mine(c.id)).map(c => {
     const limit = budgetLimit(c, receitas);
     const spent = round2(byCat[c.id] || 0);
     const pend = round2(sum(pendingBills.filter(b => b.categoryId === c.id), b => b.amount));
@@ -282,7 +339,7 @@ export function compute(data: Data, month: string, today: string) {
   const prev = addMonths(month, -1);
   return {
     month, today, tm, receitas, carry, incomes, txs, expenses, gastos, byCat, catById, bills, pendingBills, contasAVencer,
-    reembolsos, reembolsoTotal, cards, faturas, faturasAbertas, cardPaid, contribs, guardado, metaGuardar, faltaGuardar, emConta, livre,
+    reembolsos, reembolsoTotal, cards, faturas, faturasTotal, faturasReservadas, faturasAbertas, cardPaid, personReceived, terceiros, contribs, guardado, metaGuardar, faltaGuardar, emConta, livre,
     days, daysLeft, porDia, budgets, orcado, expected, aReceber, bySource, parcels, prev,
   };
 }
@@ -318,6 +375,7 @@ export function dailySeries(data: Data, c: Month) {
   c.bills.filter(b => b.status === "paga" && !isCard(b.method)).forEach(b => add(b.date, -b.amount));
   c.contribs.forEach(x => add(x.date, -x.amount));
   c.cardPaid.forEach(x => add(x.date, -x.amount));
+  c.personReceived.forEach(x => add(x.date, x.amount));
   const todayD = c.month === c.tm ? dayOf(c.today) : (c.month < c.tm ? n : 0);
   const actual: Point[] = [];
   let bal = c.carry;
@@ -332,6 +390,8 @@ export function dailySeries(data: Data, c: Month) {
       const open = cardInvoice(data, k, c.prev, c.today) - sum(c.cardPaid.filter(p => p.cardId === k.id), p => p.amount);
       if (open > 0) pev[Math.min(Math.max(k.dueDay, todayD + 1), n)] -= open;
     });
+    // O que Mãe/Pai ainda devem da fatura que vence este mês deve voltar para a conta.
+    thirdPartyFor(data, c.prev, c.today).forEach(t => { if (t.falta > 0) pev[Math.min(todayD + 1, n)] += t.falta; });
     const extraSave = round2(c.faltaGuardar + (c.aReceber * (data.settings.savePct || 0) / 100));
     pev[n] -= extraSave;
     let pb = todayD > 0 ? actual[actual.length - 1].v : c.carry;

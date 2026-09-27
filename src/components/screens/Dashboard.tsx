@@ -38,7 +38,7 @@ export function Dashboard() {
         <StatTile icon="arrowDownLeft" tone="positive" label="Receitas" value={c.receitas} hint={c.aReceber > 0 ? <>+ <Money value={c.aReceber} cents={false} /> previstos</> : "Tudo recebido"} />
         <StatTile icon="arrowUpRight" tone="negative" label="Gastos" value={c.gastos} hint={prevC.gastos ? <>{capitalize(prevName)}: <Money value={prevC.gastos} cents={false} /></> : null} />
         <StatTile icon="piggy" tone="primary" label="Guardado" value={c.guardado} hint={<>Meta: <Money value={c.metaGuardar} cents={false} /> ({data.settings.savePct}%)</>} />
-        <StatTile icon="card" tone="card" label="Cartões" value={c.faturas} hint={"Faturas de " + monthShort(c.month)} />
+        <StatTile icon="card" tone="card" label="Cartões" value={c.faturas} hint={(c.faturasTotal !== c.faturas ? "Sua parte das faturas de " : "Faturas de ") + monthShort(c.month)} />
       </div>
       <Card className="d-flow" title="Fluxo do mês" subtitle="Seu saldo em conta dia a dia">
         <CashFlowChart actual={series.actual} proj={series.proj} days={c.days} todayD={c.month === c.tm ? dayOf(c.today) : null} />
@@ -73,11 +73,11 @@ export function Dashboard() {
             {c.cards.map(k => (
               <div key={k.id} className="b-minicard">
                 <div className="b-minicard-top"><span className={"b-dot b-dot-lg is-" + k.color} /><strong>{k.name}</strong><span className="b-muted">{"vence " + ddmm(k.due)}</span></div>
-                <div className="b-minicard-vals"><Money value={k.fatura} className="b-strong" /><span className="b-muted"> fatura · {pct(k.ratio)} do limite</span></div>
+                <div className="b-minicard-vals"><Money value={k.faturaMinha} className="b-strong" /><span className="b-muted">{k.faturaTerceiros > 0 ? " sua parte" : " fatura"} · {pct(k.ratio)} do limite</span></div>
                 <div className="b-progress" style={{ height: 8 }}><div className={"b-progress-fill b-fill-card is-" + k.color} style={{ width: clamp(k.ratio, 0, 1) * 100 + "%" }} /></div>
               </div>
             ))}
-            <div className="b-total-row"><span>Total nas faturas</span><Money value={c.faturas} className="b-strong" /></div>
+            <div className="b-total-row"><span>{c.faturasTotal !== c.faturas ? "Sua parte nas faturas" : "Total nas faturas"}</span><Money value={c.faturas} className="b-strong" /></div>
           </div>
         ) : <EmptyState icon="card" title="Nenhum cartão" action={<Button size="sm" onClick={() => app.openForm("card")}>Adicionar cartão</Button>} />}
       </Card>

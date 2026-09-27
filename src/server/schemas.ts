@@ -15,6 +15,7 @@ export const schemas = {
   categories: z.object({
     id, name: text(60).min(1), icon: text(30), color: catColor,
     mode: z.enum(["fixo", "pct"]), limit: money, pct: z.number().min(0).max(100),
+    thirdParty: z.boolean().default(false),
   }),
   sources: z.object({
     id, name: text(60).min(1), icon: text(30), expected: money,
@@ -43,6 +44,7 @@ export const schemas = {
     deadline: z.union([month, z.literal("")]), monthly: money,
   }),
   contributions: z.object({ id, goalId: z.string().max(64), date: day, amount: money }),
+  personPayments: z.object({ id, categoryId: z.string().max(64), month, date: day, amount: money }),
 };
 
 export const settingsPatch = z.object({
@@ -71,6 +73,8 @@ export const dataSchema = z.object({
   installments: z.array(schemas.installments),
   goals: z.array(schemas.goals),
   contributions: z.array(schemas.contributions),
+  // Backups antigos não têm esse campo.
+  personPayments: z.array(schemas.personPayments).default([]),
   history: z.array(z.object({ m: month, receitas: money, gastos: money, guardado: money.optional() })),
 });
 

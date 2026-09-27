@@ -1,7 +1,7 @@
 "use client";
-import { ddmm, monthName, monthShort, sum, uid } from "@/lib/format";
-import { dueInvoices, futureCommitments, parcelInfo } from "@/lib/finance";
-import { Badge, Button, Card, EmptyState, Money, TransactionRow } from "../ui";
+import { capitalize, ddmm, monthName, monthShort, round2, sum, uid } from "@/lib/format";
+import { dueInvoices, futureCommitments, parcelInfo, thirdPartyFor, type ThirdParty } from "@/lib/finance";
+import { Badge, Button, CatIcon, Card, EmptyState, IconButton, Money, TransactionRow } from "../ui";
 import { CreditCardPanel, InstallmentRow } from "../finance-ui";
 import { useApp } from "../app/store";
 import { PageHead } from "./common";
@@ -18,6 +18,33 @@ export function Cards() {
     app.upsert("cardPayments", { id: uid(), cardId, date: c.month === c.tm ? c.today : c.month + "-" + String(data.cards.find(k => k.id === cardId)?.dueDay ?? 10).padStart(2, "0"), amount });
     app.toast("Pagamento da fatura registrado");
   };
+  // Gastos de outras pessoas: o mês visto e, se ainda faltar algo, o mês anterior (fatura que vence agora).
+  const people = c.terceiros;
+  const prevPending = thirdPartyFor(data, c.prev, c.today).filter(t => t.falta > 0);
+  const cardIds = new Set(data.cards.map(k => k.id));
+  const onCards = (t: ThirdParty) => round2(sum(Object.entries(t.byMethod).filter(([m]) => cardIds.has(m)), ([, v]) => v));
+  const receive = (t: ThirdParty, month: string) => app.openForm("personPayment", undefined, {
+    categoryId: t.cat.id, month, amount: t.falta, date: c.today < month + "-01" ? month + "-01" : c.today,
+  });
+  const undo = (t: ThirdParty) => { t.payments.forEach(p => app.remove("personPayments", p.id)); app.toast("Recebimento desfeito"); };
+  const personRow = (t: ThirdParty, month: string, key: string) => (
+    <div key={key} className="b-cardpay">
+      <CatIcon cat={t.cat} size={36} />
+      <div className="b-tx-main">
+        <span className="b-tx-desc">{t.cat.name}{month !== c.month ? " · " + monthName(month) : ""}</span>
+        <span className="b-tx-meta">
+          {Object.keys(t.byMethod).length
+            ? Object.entries(t.byMethod).map(([m, v], i) => <span key={m}>{i ? " · " : ""}{app.methodName(m)} <Money value={v} /></span>)
+            : "Nenhum gasto"}
+          {t.received > 0 ? <> · recebido <Money value={t.received} /></> : null}
+        </span>
+      </div>
+      <Money value={t.falta > 0 ? t.falta : t.spent} className="b-strong" />
+      {t.falta > 0.009
+        ? <Button size="sm" variant="secondary" icon="check" onClick={() => receive(t, month)}>Recebi</Button>
+        : t.spent > 0 ? <><Badge tone="positive" icon="check">Pago</Badge>{t.payments.length ? <IconButton icon="refresh" label="Desfazer recebimento" onClick={() => undo(t)} /> : null}</> : null}
+    </div>
+  );
   return <>
     <PageHead title="Cartões" sub="Faturas, limites e parcelas" actions={<Button icon="plus" variant="secondary" onClick={() => app.openForm("card")}>Novo cartão</Button>} />
     {c.cards.length ? (
@@ -29,11 +56,26 @@ export function Cards() {
           <div className="b-list">
             {c.cards.map(k => <div key={k.id} className="b-total-row"><span><span className={"b-dot b-dot-lg is-" + k.color} /> {k.name}</span><Money value={k.fatura} /></div>)}
           </div>
-          <div className="b-total-row is-big"><span>Total das faturas</span><Money value={c.faturas} className="b-amount" /></div>
+          {c.faturasTotal !== c.faturas ? <>
+            <div className="b-total-row"><span>Total das faturas</span><Money value={c.faturasTotal} className="b-strong" /></div>
+            {people.filter(t => onCards(t) > 0).map(t => <div key={t.cat.id} className="b-total-row"><span className="b-muted">{"Gastos de " + t.cat.name}</span><Money value={onCards(t)} sign="out" /></div>)}
+          </> : null}
+          <div className="b-total-row is-big"><span>{c.faturasTotal !== c.faturas ? "Sua parte" : "Total das faturas"}</span><Money value={c.faturas} className="b-amount" /></div>
           <p className="b-muted b-small">Esse valor já foi descontado do seu disponível para gastar.</p>
         </Card>
       </div>
     ) : <Card><EmptyState icon="card" title="Nenhum cartão cadastrado" action={<Button onClick={() => app.openForm("card")}>Adicionar cartão</Button>} /></Card>}
+
+    {people.length ? (
+      <Card className="b-mt" title={"Quanto cobrar em " + monthName(c.month)} subtitle="Gastos de outras pessoas no seu cartão. Ficam fora das suas métricas."
+        action={<Money value={sum(people, t => t.falta) + sum(prevPending, t => t.falta)} className="b-amount b-tone-warning" />}>
+        <div className="b-list">
+          {prevPending.map(t => personRow(t, c.prev, "prev" + t.cat.id))}
+          {people.map(t => personRow(t, c.month, t.cat.id))}
+        </div>
+        {prevPending.length ? <p className="b-muted b-small">{capitalize(monthName(c.prev))} ainda tem valor a receber (fatura que vence este mês).</p> : null}
+      </Card>
+    ) : null}
 
     {invoices.length ? (
       <Card className="b-mt" title={"Faturas que vencem em " + monthName(c.month)} subtitle={"Compras de " + monthName(c.prev) + ". Marque quando pagar para o saldo em conta ficar certo."}>

@@ -14,9 +14,9 @@ export const ROUTE_PATHS: Record<Route, string> = {
 };
 
 export type AddTab = "gasto" | "receita" | "aporte";
-export type FormKind = "category" | "source" | "bill" | "card" | "installment" | "goal" | "income" | "contribution";
+export type FormKind = "category" | "source" | "bill" | "card" | "installment" | "goal" | "income" | "contribution" | "personPayment";
 export type AddState = { tab: AddTab; preset?: Record<string, unknown>; edit?: { tab: AddTab; item: Record<string, unknown> } } | null;
-export type FormState = { kind: FormKind; item?: Record<string, unknown> } | null;
+export type FormState = { kind: FormKind; item?: Record<string, unknown>; preset?: Record<string, unknown> } | null;
 export type DeleteState = { coll: Collection; id: string; label: string } | null;
 
 class ApiError extends Error {
@@ -143,7 +143,7 @@ function useStoreValue(initialData: Data) {
     add, setAdd, form, setForm, del, setDel, toastMsg, toast: setToast,
     openAdd: (tab?: AddTab, preset?: Record<string, unknown>) => setAdd({ tab: tab || "gasto", preset }),
     openEdit: (tab: AddTab, item: Record<string, unknown>) => setAdd({ tab, edit: { tab, item } }),
-    openForm: (kind: FormKind, item?: object) => setForm({ kind, item: item as Record<string, unknown> | undefined }),
+    openForm: (kind: FormKind, item?: object, preset?: Record<string, unknown>) => setForm({ kind, item: item as Record<string, unknown> | undefined, preset }),
     askDelete: (coll: Collection, id: string, label: string) => setDel({ coll, id, label }),
     upsert, remove, setSettings, setCarry, replace, reload,
   };

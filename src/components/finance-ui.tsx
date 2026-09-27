@@ -37,7 +37,7 @@ export function BudgetBar({ budget, onClick, compact }: { budget: Budget; onClic
 
 export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
   const parts = [
-    { key: "faturas", label: "Faturas dos cartões", hint: "vencem em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--"), value: c.faturas, o: 1 },
+    { key: "faturas", label: "Faturas dos cartões", hint: (c.faturasReservadas > c.faturas + 0.009 ? "inclui o que já te devolveram, " : c.faturasTotal !== c.faturas ? "sua parte, " : "") + "vencem em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--"), value: c.faturasReservadas, o: 1 },
     ...(c.faturasAbertas > 0 ? [{ key: "abertas", label: "Fatura anterior em aberto", hint: "marque como paga em Cartões", value: c.faturasAbertas, o: 0.86 }] : []),
     { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s"), value: c.contasAVencer, o: 0.72 },
     { key: "reemb", label: "Reembolsos pendentes", hint: "sua parte a devolver", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
@@ -290,6 +290,8 @@ export function CreditCardPanel({ card, onEdit, onDelete }: { card: MonthCard; o
         <div className="b-ccard-grid">
           <div><small>Disponível</small><Money value={card.disponivel} tone={card.disponivel < 0 ? "negative" : undefined} /></div>
           <div><small>Parcelas futuras</small><Money value={card.futuro} /></div>
+          {card.faturaTerceiros > 0 ? <div><small>Sua parte da fatura</small><Money value={card.faturaMinha} /></div> : null}
+          {card.faturaTerceiros > 0 ? <div><small>De outras pessoas</small><Money value={card.faturaTerceiros} /></div> : null}
         </div>
         {onEdit || onDelete ? <div className="b-ccard-actions"><RowActions onEdit={onEdit} onDelete={onDelete} /></div> : null}
       </div>

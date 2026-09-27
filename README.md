@@ -25,6 +25,12 @@ Em conta agora        = saldo do dia 1º + entradas do mês − saídas já paga
 
 Toda essa conta fica em `src/lib/finance.ts` (funções puras, sem banco).
 
+## Gastos de outras pessoas no seu cartão
+
+Uma categoria marcada como **Gasto de outra pessoa** (ex.: Mãe, Pai) fica fora de gastos, orçamento, gráficos e insights. Em **Cartões**, a seção "Quanto cobrar" mostra quanto cada pessoa gastou no mês e o botão **Recebi** registra o que ela te devolveu (esse dinheiro entra na conta, mas não conta como receita).
+
+No "livre para gastar", da fatura só sai a sua parte enquanto a pessoa não te paga. Quando ela paga, o dinheiro dela fica reservado para a fatura. Se você pagar a fatura inteira antes de receber, o livre cai pelo valor dela e volta quando você marcar Recebi.
+
 ## Rodando localmente
 
 Precisa de Node 20+.

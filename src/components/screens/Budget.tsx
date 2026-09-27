@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { monthLabel, pct } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, Insight, Money, RowActions, Sheet, TransactionRow } from "../ui";
+import { Badge, Button, CatIcon, Card, EmptyState, Insight, Money, RowActions, Sheet, TransactionRow } from "../ui";
 import { AllocationRule, BudgetBar } from "../finance-ui";
 import { useApp } from "../app/store";
 import { PageHead } from "./common";
@@ -42,6 +42,20 @@ export function Budget({ focus }: { focus?: string }) {
                     ? <>Você ultrapassou seu limite de {x.cat.name.toLowerCase()} em <Money value={-x.rest} />.</>
                     : <>Você já utilizou {pct(x.ratio)} do orçamento de {x.cat.name.toLowerCase()}.</>}
                 </Insight>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+        {c.terceiros.length ? (
+          <Card title="Gastos de outras pessoas" subtitle="Não entram no seu orçamento. A cobrança fica em Cartões." action={<Button variant="ghost" size="sm" onClick={() => app.go("cartoes")}>Cobrar</Button>}>
+            <div className="b-list">
+              {c.terceiros.map(t => (
+                <div key={t.cat.id} className="b-cardpay">
+                  <CatIcon cat={t.cat} size={32} />
+                  <div className="b-tx-main"><span className="b-tx-desc">{t.cat.name}</span><span className="b-tx-meta">{t.falta > 0 ? <>falta receber <Money value={t.falta} /></> : t.spent > 0 ? "tudo recebido" : "sem gastos no mês"}</span></div>
+                  <Money value={t.spent} className="b-strong" />
+                  <RowActions onEdit={() => app.openForm("category", t.cat)} onDelete={() => app.askDelete("categories", t.cat.id, "Categoria")} />
+                </div>
               ))}
             </div>
           </Card>

@@ -29,14 +29,16 @@ model Carry {
 }
 
 model Category {
-  id    String  @id
-  seq   Int     @default(autoincrement())
-  name  String
-  icon  String
-  color String
-  mode  String
-  limit Decimal @db.Decimal(12, 2)
-  pct   Decimal @db.Decimal(5, 2)
+  id         String  @id
+  seq        Int     @default(autoincrement())
+  name       String
+  icon       String
+  color      String
+  mode       String
+  limit      Decimal @db.Decimal(12, 2)
+  pct        Decimal @db.Decimal(5, 2)
+  // Gasto de outra pessoa (ex.: Mãe, Pai): fica fora das métricas e vira cobrança.
+  thirdParty Boolean @default(false)
 }
 
 model Source {
@@ -140,5 +142,16 @@ model History {
   month    String  @id
   receitas Decimal @db.Decimal(12, 2)
   gastos   Decimal @db.Decimal(12, 2)
-  guardado Decimal @db.Decimal(12, 2) @default(0)
+  guardado Decimal @default(0) @db.Decimal(12, 2)
+}
+
+// Dinheiro que a pessoa dona de uma categoria de terceiro te devolveu.
+// "month" é o mês dos gastos que esse pagamento cobre.
+model PersonPayment {
+  id         String   @id
+  seq        Int      @default(autoincrement())
+  categoryId String
+  month      String
+  date       DateTime @db.Date
+  amount     Decimal  @db.Decimal(12, 2)
 }
