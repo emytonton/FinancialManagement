@@ -294,7 +294,7 @@ export function CreditCardPanel({ card, onEdit, onDelete }: { card: MonthCard; o
           <div><small>Disponível</small><Money value={card.disponivel} tone={card.disponivel < 0 ? "negative" : undefined} /></div>
           <div><small>Parcelas futuras</small><Money value={card.futuro} /></div>
           {card.caixinha > 0 ? <div><small>Na caixinha</small><Money value={card.caixinha} /></div> : null}
-          {card.caixinha > 0 ? <div><small>Restante a pagar</small><Money value={card.restante} className="b-strong" /></div> : null}
+          {card.caixinha > 0 ? <div><small>Restante a pagar</small><Money value={card.restante} className="b-strong b-tone-negative" /></div> : null}
           {card.faturaTerceiros > 0 ? <div><small>Sua parte da fatura</small><Money value={card.faturaMinha} /></div> : null}
           {card.faturaTerceiros > 0 ? <div><small>De outras pessoas</small><Money value={card.faturaTerceiros} /></div> : null}
         </div>

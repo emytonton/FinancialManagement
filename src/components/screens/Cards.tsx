@@ -71,11 +71,12 @@ export function Cards() {
             <div className="b-total-row"><span>Total das faturas</span><Money value={c.faturasTotal} className="b-strong" /></div>
             {people.filter(t => onCards(t) > 0).map(t => <div key={t.cat.id} className="b-total-row"><span className="b-muted">{"Gastos de " + t.cat.name}</span><Money value={onCards(t)} sign="out" /></div>)}
           </> : null}
-          <div className="b-total-row is-big"><span>{c.faturasTotal !== c.faturas ? "Sua parte" : "Total das faturas"}</span><Money value={c.faturas} className="b-amount" /></div>
+          {/* Com caixinha, o destaque é o restante: é o que de fato ainda sai da conta. */}
           {sum(c.cards, k => k.caixinha) > 0 ? <>
+            <div className="b-total-row"><span>{c.faturasTotal !== c.faturas ? "Sua parte" : "Total das faturas"}</span><Money value={c.faturas} className="b-strong" /></div>
             <div className="b-total-row"><span className="b-muted">Já reservado nas caixinhas</span><Money value={sum(c.cards, k => k.caixinha)} sign="out" /></div>
-            <div className="b-total-row"><span>Restante a pagar</span><Money value={round2(sum(c.cards, k => k.restante))} className="b-strong" /></div>
-          </> : null}
+            <div className="b-total-row is-big"><span>Restante a pagar</span><Money value={round2(sum(c.cards, k => k.restante))} className="b-amount b-tone-negative" /></div>
+          </> : <div className="b-total-row is-big"><span>{c.faturasTotal !== c.faturas ? "Sua parte" : "Total das faturas"}</span><Money value={c.faturas} className="b-amount" /></div>}
           <p className="b-muted b-small">Essas faturas vencem em {monthName(addMonths(c.month, 1))} e entram no livre para gastar de lá.</p>
         </Card>
       </div>
