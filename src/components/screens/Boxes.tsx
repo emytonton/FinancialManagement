@@ -69,7 +69,7 @@ export function Boxes() {
                 <div key={k.id} className="b-boxinv">
                   <div className="b-minicard-top"><span className={"b-dot b-dot-lg is-" + k.color} /><strong>{k.name}</strong>{k.caixinha > 0 ? <Badge tone="positive" icon="check">{k.restante <= 0.009 ? "Coberta" : "Em parte"}</Badge> : null}</div>
                   <div className="b-total-row"><span className="b-muted">Fatura</span><Money value={k.fatura} /></div>
-                  {k.fatura - k.restante - k.caixinha > 0.009 ? <div className="b-total-row"><span className="b-muted">Outras pessoas vão pagar</span><Money value={round2(k.fatura - k.restante - k.caixinha)} sign="out" /></div> : null}
+                  {k.fatura - k.restante - k.caixinha > 0.009 ? <div className="b-total-row"><span className="b-muted">De outras pessoas</span><Money value={round2(k.fatura - k.restante - k.caixinha)} sign="out" /></div> : null}
                   <div className="b-total-row"><span className="b-muted">Na caixinha</span><Money value={k.caixinha} sign={k.caixinha > 0 ? "out" : undefined} /></div>
                   <div className="b-total-row"><span>Restante a pagar</span><Money value={k.restante} className="b-strong" /></div>
                 </div>

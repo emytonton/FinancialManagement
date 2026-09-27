@@ -342,7 +342,8 @@ export function compute(data: Data, month: string, today: string) {
   const terceiros = thirdPartyFor(data, month, today);
   // Reservado para as faturas = valor real menos o que outras pessoas ainda te devem.
   // Antes delas pagarem, sobra só a sua parte; quando pagam, o dinheiro delas entra na conta e fica reservado aqui.
-  // Por cartão: a caixinha do cartão cobre primeiro a fatura anterior ainda aberta, depois a atual.
+  // Por cartão: a caixinha abate da próxima fatura a vencer. A anterior só recebe a caixinha
+  // enquanto ainda não venceu; depois do vencimento, tudo vai para a fatura atual.
   // O que ela cobre não sai do saldo da conta, então não é descontado do livre.
   const prevThird = thirdPartyFor(data, prevMonth, today);
   const owedOn = (list: ThirdParty[], cardId: string) => sum(list, t => t.owedByCard[cardId] || 0);
@@ -351,11 +352,11 @@ export function compute(data: Data, month: string, today: string) {
     const prevOwedK = round2(owedOn(prevThird, k.id));
     const prevOpen = round2(Math.max(0, cardInvoice(data, k, prevMonth, today) - sum(cardPaid.filter(p => p.cardId === k.id), p => p.amount) - prevOwedK));
     const cur = round2(Math.max(0, k.fatura - owedOn(terceiros, k.id)));
-    const coveredPrev = round2(Math.min(box, prevOpen));
+    const coveredPrev = today <= dateIn(month, k.dueDay) ? round2(Math.min(box, prevOpen)) : 0;
     const coveredCur = round2(Math.min(box - coveredPrev, cur));
     return { cardId: k.id, box, prevOpen, prevOwed: prevOwedK, coveredPrev, cur, coveredCur, sobra: round2(box - coveredPrev - coveredCur) };
   });
-  cards.forEach(k => { const st = invoices.find(i => i.cardId === k.id)!; k.caixinha = st.coveredCur; k.restante = round2(Math.max(0, st.cur - st.coveredCur)); });
+  cards.forEach(k => { const st = invoices.find(i => i.cardId === k.id)!; k.caixinha = st.coveredCur; k.restante = round2(Math.max(0, k.faturaMinha - st.coveredCur)); });
   const faturasReservadas = round2(sum(invoices, i => i.cur - i.coveredCur));
   const faturasAbertas = round2(sum(invoices, i => i.prevOpen - i.coveredPrev));
   const caixinhasNasFaturas = round2(sum(invoices, i => i.coveredPrev + i.coveredCur));
