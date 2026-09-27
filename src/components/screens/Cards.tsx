@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { capitalize, ddmm, fmt, monthName, monthShort, round2, sum, uid } from "@/lib/format";
+import { addMonths, capitalize, ddmm, fmt, monthName, monthShort, round2, sum, uid } from "@/lib/format";
 import { dueInvoices, futureCommitments, parcelInfo, thirdPartyFor, type ThirdParty } from "@/lib/finance";
 import { Badge, Button, CatIcon, Card, EmptyState, IconButton, Money, TransactionRow } from "../ui";
 import { CreditCardPanel, InstallmentRow } from "../finance-ui";
@@ -76,7 +76,7 @@ export function Cards() {
             <div className="b-total-row"><span className="b-muted">Já reservado nas caixinhas</span><Money value={sum(c.cards, k => k.caixinha)} sign="out" /></div>
             <div className="b-total-row"><span>Restante a pagar</span><Money value={round2(sum(c.cards, k => k.restante))} className="b-strong" /></div>
           </> : null}
-          <p className="b-muted b-small">Esse valor já foi descontado do seu disponível para gastar.</p>
+          <p className="b-muted b-small">Essas faturas vencem em {monthName(addMonths(c.month, 1))} e entram no livre para gastar de lá.</p>
         </Card>
       </div>
     ) : <Card><EmptyState icon="card" title="Nenhum cartão cadastrado" action={<Button onClick={() => app.openForm("card")}>Adicionar cartão</Button>} /></Card>}
@@ -93,7 +93,7 @@ export function Cards() {
     ) : null}
 
     {invoices.length ? (
-      <Card className="b-mt" title={"Faturas que vencem em " + monthName(c.month)} subtitle={"Compras de " + monthName(c.prev) + ". Marque quando pagar para o saldo em conta ficar certo."}>
+      <Card className="b-mt" title={"Faturas que vencem em " + monthName(c.month)} subtitle={"Compras de " + monthName(c.prev) + ". Saem do seu livre de " + monthName(c.month) + "; marque Paguei quando pagar."}>
         <div className="b-list">
           {invoices.map(inv => {
             const open = Math.max(0, inv.fatura - inv.paid);

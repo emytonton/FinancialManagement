@@ -38,7 +38,7 @@ export function Dashboard() {
         <StatTile icon="arrowDownLeft" tone="positive" label="Receitas" value={c.receitas} hint={c.aReceber > 0 ? <>+ <Money value={c.aReceber} cents={false} /> previstos</> : "Tudo recebido"} />
         <StatTile icon="arrowUpRight" tone="negative" label="Gastos" value={c.gastos} hint={prevC.gastos ? <>{capitalize(prevName)}: <Money value={prevC.gastos} cents={false} /></> : null} />
         <StatTile icon="piggy" tone="primary" label="Guardado" value={c.guardado} hint={<>Meta: <Money value={c.metaGuardar} cents={false} /> ({data.settings.savePct}%)</>} />
-        <StatTile icon="card" tone="card" label="Cartões" value={c.faturas} hint={(c.faturasTotal !== c.faturas ? "Sua parte das faturas de " : "Faturas de ") + monthShort(c.month)} />
+        <StatTile icon="card" tone="card" label="Cartões" value={c.faturas} hint={(c.faturasTotal !== c.faturas ? "Sua parte; " : "") + "vence em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--")} />
       </div>
       <Card className="d-flow" title="Fluxo do mês" subtitle="Seu saldo em conta dia a dia">
         <CashFlowChart actual={series.actual} proj={series.proj} days={c.days} todayD={c.month === c.tm ? dayOf(c.today) : null} />

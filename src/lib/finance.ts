@@ -397,7 +397,9 @@ export function compute(data: Data, month: string, today: string) {
   const cashOutBills = bills.filter(b => b.status === "paga" && !isCard(b.method));
   const saidas = round2(sum(cashOutTx, x => x.amount) + sum(cashOutBills, b => b.amount) + guardado + sum(cardPaid, p => p.amount - (p.fromBox || 0)));
   const emConta = round2(carry + receitas + sum(personReceived, p => p.amount) - saidas);
-  const livre = round2(emConta - faturasReservadas - faturasAbertas - contasAVencer - sum(reembolsos, x => x.amount) - faltaGuardar);
+  // Do cartão, o livre do mês só desconta a fatura que vence NESTE mês (compras do mês anterior) e ainda não foi paga.
+  // A fatura das compras deste mês vence no mês seguinte e entra no livre de lá (faturasReservadas fica só como informação).
+  const livre = round2(emConta - faturasAbertas - contasAVencer - sum(reembolsos, x => x.amount) - faltaGuardar);
 
   const days = dim(month);
   const daysLeft = month === tm ? days - dayOf(today) + 1 : month > tm ? days : 0;

@@ -15,13 +15,14 @@ Front e back no mesmo projeto Next.js, dados num Postgres (Neon), acesso protegi
 
 ```
 Em conta agora        = saldo do dia 1º + entradas do mês − saídas já pagas
-− Faturas dos cartões = compras no cartão neste mês + parcelas do mês
-− Fatura anterior     = o que ainda não foi pago da fatura que vence neste mês
+− Faturas do mês      = fatura que vence neste mês e ainda não foi paga (menos a caixinha do cartão)
 − Contas a vencer     = contas fixas pendentes ou atrasadas
 − Reembolsos          = sua parte em compras que outra pessoa pagou
 − Falta guardar       = (% de guardar × entradas do mês) − o que já foi guardado
 = Livre para gastar   → dividido pelos dias restantes = "R$ por dia"
 ```
+
+A fatura das compras deste mês vence no mês seguinte e entra no livre de lá; até lá aparece só como "próxima fatura".
 
 Toda essa conta fica em `src/lib/finance.ts` (funções puras, sem banco).
 

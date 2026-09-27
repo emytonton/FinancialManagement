@@ -1,7 +1,7 @@
 "use client";
 // Componentes que mostram os números do mês: herói, gráficos, cartões, metas.
 import { useEffect, useRef, useState } from "react";
-import { WEEK, addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, monthLabel, monthName, monthShort, pad, pct, round2, sum } from "@/lib/format";
+import { addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, monthLabel, monthName, monthShort, pad, pct, round2, sum, WEEK } from "@/lib/format";
 import { parcelInfo, stateOf, type Budget, type GoalStats, type Month, type MonthCard, type Point, type SpendRow } from "@/lib/finance";
 import type { Goal, Installment, Source } from "@/lib/types";
 import { Badge, Button, CatIcon, EmptyState, Icon, Money, ProgressBar, RowActions } from "./ui";
@@ -37,8 +37,7 @@ export function BudgetBar({ budget, onClick, compact }: { budget: Budget; onClic
 
 export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
   const parts = [
-    { key: "faturas", label: "Faturas dos cartões", hint: (c.caixinhasNasFaturas > 0 ? "restante, já tirando as caixinhas; " : c.faturasReservadas > c.faturas + 0.009 ? "inclui o que já te devolveram, " : c.faturasTotal !== c.faturas ? "sua parte, " : "") + "vencem em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--"), value: c.faturasReservadas, o: 1 },
-    ...(c.faturasAbertas > 0 ? [{ key: "abertas", label: "Fatura anterior em aberto", hint: "marque como paga em Cartões", value: c.faturasAbertas, o: 0.86 }] : []),
+    { key: "faturas", label: "Faturas que vencem em " + monthName(c.month), hint: c.cards.length ? ("vence " + ddmm(dateIn(c.month, c.cards[0].dueDay)) + (c.invoices.some(i => i.coveredPrev > 0) ? ", já tirando a caixinha" : "") + "; toque Paguei em Cartões ao pagar") : "sem cartões", value: c.faturasAbertas, o: 1 },
     { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s"), value: c.contasAVencer, o: 0.72 },
     { key: "reemb", label: "Reembolsos pendentes", hint: "sua parte a devolver", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
     { key: "guardar", label: "Falta guardar", hint: "meta de " + pct(c.metaGuardar / (c.receitas || 1)), value: c.faltaGuardar, o: 0.3 },
@@ -79,6 +78,9 @@ export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
             <Money value={free} tone={free < 0 ? "negative" : "positive"} />
           </li>
         </ul>
+        {c.faturasReservadas > 0 && c.cards.length ? (
+          <p className="b-hero-note"><Icon name="card" size={14} /><span>Próxima fatura: <Money value={c.faturasReservadas} /> vence em {ddmm(c.cards[0].due)}{c.cards.some(k => k.caixinha > 0) ? " (já tirando a caixinha)" : ""} e entra no livre de {monthName(addMonths(c.month, 1))}.</span></p>
+        ) : null}
       </div>
     </section>
   );
