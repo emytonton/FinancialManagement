@@ -34,7 +34,7 @@ export const schemas = {
   cards: z.object({
     id, name: text(40).min(1), limit: money, closeDay: dayOfMonth, dueDay: dayOfMonth, color: z.enum(["nubank", "mp"]),
   }),
-  cardPayments: z.object({ id, cardId: z.string().max(64), date: day, amount: money }),
+  cardPayments: z.object({ id, cardId: z.string().max(64), date: day, amount: money, fromBox: money.default(0) }),
   installments: z.object({
     id, desc: text(120).min(1), cardId: z.string().max(64), categoryId: z.string().max(64),
     amount: money, n: z.number().int().min(1).max(72), start: month,
@@ -46,6 +46,7 @@ export const schemas = {
   }),
   contributions: z.object({ id, goalId: z.string().max(64), date: day, amount: money }),
   personPayments: z.object({ id, categoryId: z.string().max(64), month, date: day, amount: money }),
+  boxes: z.object({ id, name: text(60).min(1), icon: text(30), amount: z.number().finite().min(-1e9).max(1e9), cardId: z.string().max(64).optional() }),
 };
 
 export const settingsPatch = z.object({
@@ -76,6 +77,7 @@ export const dataSchema = z.object({
   contributions: z.array(schemas.contributions),
   // Backups antigos não têm esse campo.
   personPayments: z.array(schemas.personPayments).default([]),
+  boxes: z.array(schemas.boxes).default([]),
   history: z.array(z.object({ m: month, receitas: money, gastos: money, guardado: money.optional() })),
 });
 

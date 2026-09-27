@@ -31,6 +31,13 @@ Uma categoria marcada como **Gasto de outra pessoa** (ex.: Mãe, Pai) fica fora 
 
 No "livre para gastar", da fatura só sai a sua parte enquanto a pessoa não te paga. Quando ela paga, o dinheiro dela fica reservado para a fatura. Se você pagar a fatura inteira antes de receber, o livre cai pelo valor dela e volta quando você marcar Recebi.
 
+## Caixinhas
+
+Dinheiro separado fora do saldo da conta (como as caixinhas do Mercado Pago). Cada caixinha guarda só o valor disponível, editável a qualquer momento.
+
+- **Ligada a um cartão** (ex.: Cartão Nubank): o valor abate da fatura desse cartão. Primeiro cobre a fatura anterior ainda aberta, depois a atual. Fatura − caixinha = restante a pagar, e só o restante sai do "livre para gastar". Ao marcar **Paguei**, o app usa primeiro a caixinha (e tira o valor dela) e o resto sai da conta.
+- **Sem cartão** (ex.: Reserva, Academia): só aparece como dinheiro reservado; não mexe no livre nem nas faturas.
+
 ## Rodando localmente
 
 Precisa de Node 20+.

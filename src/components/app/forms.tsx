@@ -135,6 +135,15 @@ const FORMS: Record<FormKind, FormDef> = {
     { key: "amount", label: "Quanto recebeu", type: "money", required: true },
     { key: "date", label: "Data", type: "date", required: true }],
     blank: (_d, month, today) => ({ id: uid(), categoryId: "", month, date: today, amount: 0 }) },
+  box: { title: "Caixinha", coll: "boxes", fields: [
+    { key: "name", label: "Nome", required: true, placeholder: "Ex.: Reserva" },
+    { key: "amount", label: "Valor disponível", type: "money", hint: "Quanto tem nela agora. Atualize sempre que guardar ou tirar dinheiro." },
+    { key: "cardId", label: "Reservada para pagar", type: "select", hint: "Ligada a um cartão, o valor abate da fatura dele." },
+    { key: "icon", label: "Ícone", type: "select", options: ICON_OPTIONS }],
+    blank: () => ({ id: uid(), name: "", amount: 0, cardId: "", icon: "piggy" }),
+    load: b => ({ ...b, cardId: b.cardId || "" }),
+    // undefined (e não ausente) para desligar do cartão ao editar.
+    save: b => ({ ...b, amount: Number(b.amount) || 0, cardId: b.cardId || undefined }) },
   contribution: { title: "Aporte", coll: "contributions", fields: [
     { key: "amount", label: "Valor guardado", type: "money", required: true },
     { key: "goalId", label: "Meta", type: "select", half: true },
@@ -150,7 +159,7 @@ export function FormHost() {
     if (x.key === "categoryId") return { ...x, options: data.categories.map(c => ({ value: c.id, label: c.name })) };
     if (x.key === "sourceId") return { ...x, options: data.sources.map(s => ({ value: s.id, label: s.name })) };
     if (x.key === "goalId") return { ...x, options: data.goals.map(g => ({ value: g.id, label: g.name })) };
-    if (x.key === "cardId") return { ...x, options: data.cards.map(c => ({ value: c.id, label: c.name })) };
+    if (x.key === "cardId") return { ...x, options: [...(form.kind === "box" ? [{ value: "", label: "Nada (só dinheiro separado)" }] : []), ...data.cards.map(c => ({ value: c.id, label: form.kind === "box" ? "Fatura " + c.name : c.name }))] };
     if (x.key === "method") return { ...x, options: app.methods.map(m => ({ value: m.id, label: m.name })) };
     if (form.kind === "installment" && x.key === "date") return { ...x, hint: (v: Values) => invoiceHint(data, String(v.cardId || ""), String(v.date || ""), "1ª parcela na fatura que vence em ") };
     return x;

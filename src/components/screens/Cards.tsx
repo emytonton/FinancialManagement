@@ -1,5 +1,5 @@
 "use client";
-import { capitalize, ddmm, monthName, monthShort, round2, sum, uid } from "@/lib/format";
+import { capitalize, ddmm, fmt, monthName, monthShort, round2, sum, uid } from "@/lib/format";
 import { dueInvoices, futureCommitments, parcelInfo, thirdPartyFor, type ThirdParty } from "@/lib/finance";
 import { Badge, Button, CatIcon, Card, EmptyState, IconButton, Money, TransactionRow } from "../ui";
 import { CreditCardPanel, InstallmentRow } from "../finance-ui";
@@ -14,9 +14,16 @@ export function Cards() {
   const active = data.installments.filter(i => { const p = parcelInfo(i, c.month); return p.active || p.idx < 1; });
   const invoices = dueInvoices(data, c).filter(i => i.fatura > 0 || i.paid > 0);
   const cardName = (id: string) => data.cards.find(k => k.id === id)?.name ?? id;
-  const pay = (cardId: string, amount: number) => {
-    app.upsert("cardPayments", { id: uid(), cardId, date: c.month === c.tm ? c.today : c.month + "-" + String(data.cards.find(k => k.id === cardId)?.dueDay ?? 10).padStart(2, "0"), amount });
-    app.toast("Pagamento da fatura registrado");
+  // Pagar a fatura: usa primeiro o que está na caixinha do cartão (e tira de lá); o resto sai da conta.
+  const pay = (cardId: string, amount: number, fromBox: number) => {
+    const useBox = round2(Math.min(fromBox, amount));
+    app.upsert("cardPayments", { id: uid(), cardId, date: c.month === c.tm ? c.today : c.month + "-" + String(data.cards.find(k => k.id === cardId)?.dueDay ?? 10).padStart(2, "0"), amount, fromBox: useBox });
+    let rest = useBox;
+    data.boxes.filter(b => b.cardId === cardId && b.amount > 0).forEach(b => {
+      const take = round2(Math.min(rest, b.amount));
+      if (take > 0) { app.upsert("boxes", { ...b, amount: round2(b.amount - take) }); rest = round2(rest - take); }
+    });
+    app.toast(useBox <= 0 ? "Pagamento da fatura registrado" : useBox >= amount ? "Fatura paga com a caixinha (" + fmt(useBox) + ")" : "Pago: " + fmt(useBox) + " da caixinha e " + fmt(round2(amount - useBox)) + " da conta");
   };
   // Gastos de outras pessoas: o mês visto e, se ainda faltar algo, o mês anterior (fatura que vence agora).
   const people = c.terceiros;
@@ -61,6 +68,10 @@ export function Cards() {
             {people.filter(t => onCards(t) > 0).map(t => <div key={t.cat.id} className="b-total-row"><span className="b-muted">{"Gastos de " + t.cat.name}</span><Money value={onCards(t)} sign="out" /></div>)}
           </> : null}
           <div className="b-total-row is-big"><span>{c.faturasTotal !== c.faturas ? "Sua parte" : "Total das faturas"}</span><Money value={c.faturas} className="b-amount" /></div>
+          {sum(c.cards, k => k.caixinha) > 0 ? <>
+            <div className="b-total-row"><span className="b-muted">Já reservado nas caixinhas</span><Money value={sum(c.cards, k => k.caixinha)} sign="out" /></div>
+            <div className="b-total-row"><span>Restante a pagar</span><Money value={round2(sum(c.cards, k => k.restante))} className="b-strong" /></div>
+          </> : null}
           <p className="b-muted b-small">Esse valor já foi descontado do seu disponível para gastar.</p>
         </Card>
       </div>
@@ -87,11 +98,11 @@ export function Cards() {
                 <span className={"b-dot b-dot-lg is-" + inv.card.color} />
                 <div className="b-tx-main">
                   <span className="b-tx-desc">{"Fatura " + inv.card.name}</span>
-                  <span className="b-tx-meta">{"Vence " + ddmm(inv.due)}{inv.paid > 0 ? <> · pago <Money value={inv.paid} /></> : null}</span>
+                  <span className="b-tx-meta">{"Vence " + ddmm(inv.due)}{inv.paid > 0 ? <> · pago <Money value={inv.paid} /></> : null}{open > 0.009 && inv.fromBox > 0 ? <> · <Money value={Math.min(inv.fromBox, open)} /> na caixinha, restam <Money value={round2(open - Math.min(inv.fromBox, open))} /></> : null}</span>
                 </div>
                 <Money value={inv.fatura} className="b-strong" />
                 {open > 0.009
-                  ? <Button size="sm" variant="secondary" icon="check" onClick={() => pay(inv.card.id, Math.round(open * 100) / 100)}>Paguei</Button>
+                  ? <Button size="sm" variant="secondary" icon="check" onClick={() => pay(inv.card.id, round2(open), inv.fromBox)}>Paguei</Button>
                   : <Badge tone="positive" icon="check">Paga</Badge>}
               </div>
             );

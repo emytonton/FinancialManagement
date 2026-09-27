@@ -66,7 +66,7 @@ const tables = {
   cardPayments: {
     model: (db: Client) => db.cardPayment,
     toDb: (x: Input<"cardPayments">) => ({ ...x, date: fromDay(x.date) }),
-    fromDb: (r: any) => ({ id: r.id, cardId: r.cardId, date: toDay(r.date), amount: num(r.amount) }),
+    fromDb: (r: any) => ({ id: r.id, cardId: r.cardId, date: toDay(r.date), amount: num(r.amount), fromBox: num(r.fromBox) }),
   },
   installments: {
     model: (db: Client) => db.installment,
@@ -87,6 +87,11 @@ const tables = {
     model: (db: Client) => db.personPayment,
     toDb: (x: Input<"personPayments">) => ({ ...x, date: fromDay(x.date) }),
     fromDb: (r: any) => ({ id: r.id, categoryId: r.categoryId, month: r.month, date: toDay(r.date), amount: num(r.amount) }),
+  },
+  boxes: {
+    model: (db: Client) => db.box,
+    toDb: (x: Input<"boxes">) => ({ ...x, cardId: x.cardId || null }),
+    fromDb: (r: any) => ({ id: r.id, name: r.name, icon: r.icon, amount: num(r.amount), ...(r.cardId ? { cardId: r.cardId } : {}) }),
   },
 } as const;
 

@@ -37,7 +37,7 @@ export function BudgetBar({ budget, onClick, compact }: { budget: Budget; onClic
 
 export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
   const parts = [
-    { key: "faturas", label: "Faturas dos cartões", hint: (c.faturasReservadas > c.faturas + 0.009 ? "inclui o que já te devolveram, " : c.faturasTotal !== c.faturas ? "sua parte, " : "") + "vencem em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--"), value: c.faturasReservadas, o: 1 },
+    { key: "faturas", label: "Faturas dos cartões", hint: (c.caixinhasNasFaturas > 0 ? "restante, já tirando as caixinhas; " : c.faturasReservadas > c.faturas + 0.009 ? "inclui o que já te devolveram, " : c.faturasTotal !== c.faturas ? "sua parte, " : "") + "vencem em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--"), value: c.faturasReservadas, o: 1 },
     ...(c.faturasAbertas > 0 ? [{ key: "abertas", label: "Fatura anterior em aberto", hint: "marque como paga em Cartões", value: c.faturasAbertas, o: 0.86 }] : []),
     { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s"), value: c.contasAVencer, o: 0.72 },
     { key: "reemb", label: "Reembolsos pendentes", hint: "sua parte a devolver", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
@@ -60,6 +60,7 @@ export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
       </div>
       <div className="b-hero-break">
         <div className="b-waterfall-head"><span>Em conta agora</span><Money value={c.emConta} className="b-strong" /></div>
+        {c.caixinhas > 0 ? <p className="b-hero-note"><Icon name="piggy" size={14} /><span>Fora da conta: <Money value={c.caixinhas} /> em caixinhas{c.caixinhasNasFaturas > 0 ? <>, <Money value={c.caixinhasNasFaturas} /> delas já pagando faturas</> : null}.</span></p> : null}
         <div className="b-stack" role="img" aria-label="Divisão do saldo em conta">
           {parts.filter(p => p.value > 0).map(p => <span key={p.key} className="b-stack-seg b-seg-commit" style={{ flexGrow: p.value / total, opacity: p.o }} title={p.label} />)}
           {free > 0 ? <span className="b-stack-seg b-seg-free" style={{ flexGrow: free / total }} title="Livre" /> : null}
@@ -190,7 +191,7 @@ export function CashFlowChart({ actual, proj, days, height = 200, todayD }: { ac
   };
   return (
     <div className="b-flow" ref={ref}>
-      <svg width={w} height={height} role="img" aria-label="Evolução do saldo no mês" onMouseMove={onMove} onMouseLeave={() => setHv(null)}>
+      <svg width={w} height={height} viewBox={`0 0 ${w} ${height}`} style={{ maxWidth: "100%", height: "auto" }} role="img" aria-label="Evolução do saldo no mês" onMouseMove={onMove} onMouseLeave={() => setHv(null)}>
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={padL} x2={w - padR} y1={Y(t)} y2={Y(t)} className="b-grid" />
@@ -290,6 +291,8 @@ export function CreditCardPanel({ card, onEdit, onDelete }: { card: MonthCard; o
         <div className="b-ccard-grid">
           <div><small>Disponível</small><Money value={card.disponivel} tone={card.disponivel < 0 ? "negative" : undefined} /></div>
           <div><small>Parcelas futuras</small><Money value={card.futuro} /></div>
+          {card.caixinha > 0 ? <div><small>Na caixinha</small><Money value={card.caixinha} /></div> : null}
+          {card.caixinha > 0 ? <div><small>Restante a pagar</small><Money value={card.restante} className="b-strong" /></div> : null}
           {card.faturaTerceiros > 0 ? <div><small>Sua parte da fatura</small><Money value={card.faturaMinha} /></div> : null}
           {card.faturaTerceiros > 0 ? <div><small>De outras pessoas</small><Money value={card.faturaTerceiros} /></div> : null}
         </div>

@@ -35,3 +35,16 @@ body {
 .is-mobile .b-cardpay { flex-wrap: wrap; row-gap: var(--space-2); }
 .is-mobile .b-cardpay > .b-tx-main { flex: 1 1 calc(100% - 52px); }
 .is-mobile .b-cardpay > .b-money { margin-left: auto; }
+
+/* Caixinhas */
+.b-box { cursor: pointer; }
+.b-boxinv { display: flex; flex-direction: column; gap: 6px; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.b-boxinv:last-child { border-bottom: 0; }
+.b-boxinv .b-total-row { padding: 0; border: 0; }
+.d-boxes { grid-column: span 12; }
+.b-boxstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-3); }
+.b-boxchip { display: flex; flex-direction: column; gap: 4px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-2); border: 0; text-align: left; cursor: pointer; color: var(--ink); }
+.b-boxchip small { color: var(--ink-3); font-size: 12px; line-height: 16px; }
+.b-boxchip .b-money { font-weight: 700; }
+.is-mobile .d-boxes { order: 8; }
+.is-mobile .b-boxstrip { grid-template-columns: 1fr 1fr; }

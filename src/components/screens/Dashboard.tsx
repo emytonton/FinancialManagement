@@ -74,6 +74,7 @@ export function Dashboard() {
               <div key={k.id} className="b-minicard">
                 <div className="b-minicard-top"><span className={"b-dot b-dot-lg is-" + k.color} /><strong>{k.name}</strong><span className="b-muted">{"vence " + ddmm(k.due)}</span></div>
                 <div className="b-minicard-vals"><Money value={k.faturaMinha} className="b-strong" /><span className="b-muted">{k.faturaTerceiros > 0 ? " sua parte" : " fatura"} · {pct(k.ratio)} do limite</span></div>
+                {k.caixinha > 0 ? <div className="b-muted b-small"><Money value={k.caixinha} /> na caixinha · restam <Money value={k.restante} className="b-strong" /></div> : null}
                 <div className="b-progress" style={{ height: 8 }}><div className={"b-progress-fill b-fill-card is-" + k.color} style={{ width: clamp(k.ratio, 0, 1) * 100 + "%" }} /></div>
               </div>
             ))}
@@ -100,6 +101,22 @@ export function Dashboard() {
       <Card className="d-next" title="Próximos compromissos" action={<Button variant="ghost" size="sm" onClick={() => app.go("calendario")}>Calendário</Button>}>
         {up.length ? <div className="b-list">{up.map((e, i) => <UpcomingItem key={i} {...e} />)}</div> : <EmptyState icon="calendar" title="Nada nos próximos dias" />}
       </Card>
+      {data.boxes.length ? (
+        <Card className="d-boxes" title="Caixinhas" subtitle={<>Total <Money value={c.caixinhas} />, fora do saldo da conta</>} action={<Button variant="ghost" size="sm" onClick={() => app.go("caixinhas")}>Ver caixinhas</Button>}>
+          <div className="b-boxstrip">
+            {data.boxes.map(b => {
+              const card = data.cards.find(k => k.id === b.cardId);
+              return (
+                <button key={b.id} type="button" className="b-boxchip" onClick={() => app.openForm("box", b)}>
+                  <small>{b.name}</small>
+                  <Money value={b.amount} />
+                  <small>{card ? "para a fatura " + card.name : "separado"}</small>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
     </div>
   </>;
 }

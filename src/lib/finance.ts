@@ -1,6 +1,6 @@
 // Toda a matemática do Bolso. Funções puras: recebem os dados e o mês,
 // devolvem os números. Rodam no navegador (telas) e no servidor (dados iniciais).
-import type { Bill, Category, CreditCard, Data, Goal, Installment, Source, Tone, Tx, Income, Contribution, CardPayment, PersonPayment } from "./types";
+import type { Bill, Category, CreditCard, Data, Goal, Installment, Source, Tone, Tx, Income, Contribution, CardPayment, PersonPayment, Box } from "./types";
 import { MONTHS, addMonths, dateIn, dayOf, dim, fmt, monthDiff, pct, round2, sum, uid, ym } from "./format";
 
 export const BASE_METHODS = [
@@ -141,6 +141,8 @@ export function mockData(): Data {
       { id: uid(), goalId: "g1", date: "2026-09-07", amount: 500 },
       { id: uid(), goalId: "g2", date: "2026-09-11", amount: 100 },
     ],
+    boxes: defaultBoxes([{ id: "nubank", name: "Nubank", limit: 0, closeDay: 3, dueDay: 10, color: "nubank" }, { id: "mp", name: "Mercado Pago", limit: 0, closeDay: 3, dueDay: 10, color: "mp" }])
+      .map(b => ({ ...b, amount: ({ "cx-nubank": 300, "cx-mp": 150, "cx-casa": 420, "cx-reserva": 1800, "cx-academia": 90 } as Record<string, number>)[b.id] ?? 0 })),
     personPayments: [
       { id: uid(), categoryId: "mae", month: "2026-08", date: "2026-09-09", amount: 86.4 },
       { id: uid(), categoryId: "pai", month: "2026-08", date: "2026-09-10", amount: 150 },
@@ -155,11 +157,24 @@ export function mockData(): Data {
 }
 
 // Dados vazios, mantendo as configurações e as categorias padrão.
+// Caixinhas iniciais. As dos cartões ficam ligadas ao cartão quando ele existe.
+export function defaultBoxes(cards: CreditCard[] = []): Box[] {
+  const find = (re: RegExp) => cards.find(k => re.test(k.name))?.id;
+  const card = (id: string, name: string, re: RegExp): Box => { const cardId = find(re); return { id, name, icon: "card", amount: 0, ...(cardId ? { cardId } : {}) }; };
+  return [
+    card("cx-nubank", "Cartão Nubank", /nubank/i),
+    card("cx-mp", "Cartão Mercado Pago", /mercado/i),
+    { id: "cx-casa", name: "Contas de Casa", icon: "house", amount: 0 },
+    { id: "cx-reserva", name: "Reserva", icon: "shield", amount: 0 },
+    { id: "cx-academia", name: "Academia", icon: "heart", amount: 0 },
+  ];
+}
+
 export function emptyData(prev?: Data): Data {
   const settings = prev ? { ...prev.settings, demo: false } : { name: "", savePct: 30, theme: "auto" as const, lock: false, demo: false, demoToday: "2026-09-26" };
   return {
     version: 1, settings, carry: {}, categories: DEFAULT_CATEGORIES.map(c => ({ ...c })),
-    sources: [], incomes: [], txs: [], bills: [], cards: [], cardPayments: [], installments: [], goals: [], contributions: [], personPayments: [], history: [],
+    sources: [], incomes: [], txs: [], bills: [], cards: [], cardPayments: [], installments: [], goals: [], contributions: [], personPayments: [], boxes: defaultBoxes(), history: [],
   };
 }
 
@@ -231,7 +246,7 @@ export function cardInvoice(data: Data, card: CreditCard, month: string, today: 
 // Categorias de outra pessoa: o gasto passa pelo seu cartão/conta, mas quem paga é ela.
 export const thirdIdsOf = (data: Data) => new Set(data.categories.filter(c => c.thirdParty).map(c => c.id));
 
-export type ThirdParty = { cat: Category; spent: number; onCards: number; owedOnCards: number; byMethod: Record<string, number>; received: number; falta: number; payments: PersonPayment[] };
+export type ThirdParty = { cat: Category; spent: number; onCards: number; owedOnCards: number; owedByCard: Record<string, number>; byMethod: Record<string, number>; received: number; falta: number; payments: PersonPayment[] };
 
 // Quanto cada pessoa gastou no mês (em qualquer forma de pagamento) e quanto já te devolveu.
 export function thirdPartyFor(data: Data, month: string, today: string): ThirdParty[] {
@@ -253,14 +268,21 @@ export function thirdPartyFor(data: Data, month: string, today: string): ThirdPa
     const cards = cardIdsOf(data);
     const onCards = round2(sum(Object.entries(byMethod).filter(([m]) => cards.has(m)), ([, v]) => v));
     // Parte da fatura que a pessoa ainda não te devolveu (o que ela já devolveu fica reservado para pagar o cartão).
-    return { cat, spent, onCards, owedOnCards: round2(Math.min(falta, onCards)), byMethod, received, falta, payments };
+    // O que ainda falta receber, distribuído pelos cartões (na ordem dos cartões).
+    const owedByCard: Record<string, number> = {};
+    let rest = Math.min(falta, onCards);
+    data.cards.forEach(k => { const v = round2(Math.min(rest, byMethod[k.id] || 0)); if (v > 0) { owedByCard[k.id] = v; rest -= v; } });
+    return { cat, spent, onCards, owedOnCards: round2(Math.min(falta, onCards)), owedByCard, byMethod, received, falta, payments };
   });
 }
 
 export type Expense = { src: "tx" | "parcel" | "bill"; id: string; date: string; desc: string; categoryId: string; amount: number; method: string; ref: Tx | (Installment & { idx: number }) | Bill };
 export type Budget = { cat: Category; limit: number; spent: number; pend: number; ratio: number; rest: number; state: BudgetState };
 export type MonthBill = Bill & { status: BillStatus; date: string };
+// Situação das faturas de um cartão no mês, já contando a caixinha dele.
+export type CardInvoiceStatus = { cardId: string; box: number; prevOpen: number; prevOwed: number; coveredPrev: number; cur: number; coveredCur: number; sobra: number };
 export type MonthCard = CreditCard & {
+  caixinha: number; restante: number;
   fatura: number; faturaMinha: number; faturaTerceiros: number; futuro: number; usado: number; disponivel: number; ratio: number; due: string;
   items: InvoiceItem[];
 };
@@ -307,7 +329,7 @@ export function compute(data: Data, month: string, today: string) {
     const futuro = round2(sum(data.installments.filter(i => i.cardId === c.id), i => { const pi = parcelInfo(i, month); return pi.idx < 1 ? i.n * i.amount : pi.remaining * i.amount; }));
     const usado = round2(fatura + futuro);
     const due = dateIn(addMonths(month, 1), c.dueDay);
-    return { ...c, fatura, faturaMinha: round2(fatura - faturaTerceiros), faturaTerceiros, futuro, usado, disponivel: round2(c.limit - usado), ratio: c.limit ? usado / c.limit : 0, due, items };
+    return { ...c, caixinha: 0, restante: fatura, fatura, faturaMinha: round2(fatura - faturaTerceiros), faturaTerceiros, futuro, usado, disponivel: round2(c.limit - usado), ratio: c.limit ? usado / c.limit : 0, due, items };
   });
   // faturas = só a sua parte; faturasTotal = o valor real que vem na fatura.
   const faturas = round2(sum(cards, c => c.faturaMinha));
@@ -320,9 +342,24 @@ export function compute(data: Data, month: string, today: string) {
   const terceiros = thirdPartyFor(data, month, today);
   // Reservado para as faturas = valor real menos o que outras pessoas ainda te devem.
   // Antes delas pagarem, sobra só a sua parte; quando pagam, o dinheiro delas entra na conta e fica reservado aqui.
-  const faturasReservadas = round2(faturasTotal - sum(terceiros, t => t.owedOnCards));
-  const prevOwed = sum(thirdPartyFor(data, prevMonth, today), t => t.owedOnCards);
-  const faturasAbertas = round2(Math.max(0, sum(data.cards, k => cardInvoice(data, k, prevMonth, today)) - sum(cardPaid, p => p.amount) - prevOwed));
+  // Por cartão: a caixinha do cartão cobre primeiro a fatura anterior ainda aberta, depois a atual.
+  // O que ela cobre não sai do saldo da conta, então não é descontado do livre.
+  const prevThird = thirdPartyFor(data, prevMonth, today);
+  const owedOn = (list: ThirdParty[], cardId: string) => sum(list, t => t.owedByCard[cardId] || 0);
+  const invoices: CardInvoiceStatus[] = cards.map(k => {
+    const box = round2(Math.max(0, sum(data.boxes.filter(b => b.cardId === k.id), b => b.amount)));
+    const prevOwedK = round2(owedOn(prevThird, k.id));
+    const prevOpen = round2(Math.max(0, cardInvoice(data, k, prevMonth, today) - sum(cardPaid.filter(p => p.cardId === k.id), p => p.amount) - prevOwedK));
+    const cur = round2(Math.max(0, k.fatura - owedOn(terceiros, k.id)));
+    const coveredPrev = round2(Math.min(box, prevOpen));
+    const coveredCur = round2(Math.min(box - coveredPrev, cur));
+    return { cardId: k.id, box, prevOpen, prevOwed: prevOwedK, coveredPrev, cur, coveredCur, sobra: round2(box - coveredPrev - coveredCur) };
+  });
+  cards.forEach(k => { const st = invoices.find(i => i.cardId === k.id)!; k.caixinha = st.coveredCur; k.restante = round2(Math.max(0, st.cur - st.coveredCur)); });
+  const faturasReservadas = round2(sum(invoices, i => i.cur - i.coveredCur));
+  const faturasAbertas = round2(sum(invoices, i => i.prevOpen - i.coveredPrev));
+  const caixinhasNasFaturas = round2(sum(invoices, i => i.coveredPrev + i.coveredCur));
+  const caixinhas = round2(sum(data.boxes, b => b.amount));
 
   const contribs: Contribution[] = data.contributions.filter(inMonth);
   const guardado = round2(sum(contribs, c => c.amount));
@@ -331,7 +368,7 @@ export function compute(data: Data, month: string, today: string) {
 
   const cashOutTx = txs.filter(x => !isCard(x.method) && !(x.kind === "compartilhado" && x.status === "pendente"));
   const cashOutBills = bills.filter(b => b.status === "paga" && !isCard(b.method));
-  const saidas = round2(sum(cashOutTx, x => x.amount) + sum(cashOutBills, b => b.amount) + guardado + sum(cardPaid, p => p.amount));
+  const saidas = round2(sum(cashOutTx, x => x.amount) + sum(cashOutBills, b => b.amount) + guardado + sum(cardPaid, p => p.amount - (p.fromBox || 0)));
   const emConta = round2(carry + receitas + sum(personReceived, p => p.amount) - saidas);
   const livre = round2(emConta - faturasReservadas - faturasAbertas - contasAVencer - sum(reembolsos, x => x.amount) - faltaGuardar);
 
@@ -360,7 +397,7 @@ export function compute(data: Data, month: string, today: string) {
   const prev = addMonths(month, -1);
   return {
     month, today, tm, receitas, carry, incomes, txs, expenses, gastos, byCat, catById, bills, pendingBills, contasAVencer,
-    reembolsos, reembolsoTotal, cards, faturas, faturasTotal, faturasReservadas, faturasAbertas, cardPaid, personReceived, terceiros, contribs, guardado, metaGuardar, faltaGuardar, emConta, livre,
+    reembolsos, reembolsoTotal, cards, faturas, faturasTotal, faturasReservadas, faturasAbertas, invoices, caixinhasNasFaturas, caixinhas, cardPaid, personReceived, terceiros, contribs, guardado, metaGuardar, faltaGuardar, emConta, livre,
     days, daysLeft, porDia, budgets, orcado, expected, aReceber, bySource, parcels, prev,
   };
 }
@@ -395,7 +432,7 @@ export function dailySeries(data: Data, c: Month) {
   c.txs.filter(x => !isCard(x.method) && !(x.kind === "compartilhado" && x.status === "pendente")).forEach(x => add(x.date, -x.amount));
   c.bills.filter(b => b.status === "paga" && !isCard(b.method)).forEach(b => add(b.date, -b.amount));
   c.contribs.forEach(x => add(x.date, -x.amount));
-  c.cardPaid.forEach(x => add(x.date, -x.amount));
+  c.cardPaid.forEach(x => add(x.date, -(x.amount - (x.fromBox || 0))));
   c.personReceived.forEach(x => add(x.date, x.amount));
   const todayD = c.month === c.tm ? dayOf(c.today) : (c.month < c.tm ? n : 0);
   const actual: Point[] = [];
@@ -408,7 +445,8 @@ export function dailySeries(data: Data, c: Month) {
     c.pendingBills.forEach(b => { const k = Math.max(dayOf(b.date), todayD + 1); pev[Math.min(k, n)] -= b.amount; });
     c.reembolsos.forEach(x => { pev[Math.min(todayD + 1, n)] -= x.amount; });
     data.cards.forEach(k => {
-      const open = cardInvoice(data, k, c.prev, c.today) - sum(c.cardPaid.filter(p => p.cardId === k.id), p => p.amount);
+      const st = c.invoices.find(i => i.cardId === k.id);
+      const open = st ? st.prevOpen - st.coveredPrev + st.prevOwed : 0;
       if (open > 0) pev[Math.min(Math.max(k.dueDay, todayD + 1), n)] -= open;
     });
     // O que Mãe/Pai ainda devem da fatura que vence este mês deve voltar para a conta.
@@ -469,6 +507,7 @@ export function dueInvoices(data: Data, c: Month) {
   return data.cards.map(card => {
     const fatura = cardInvoice(data, card, c.prev, c.today);
     const paid = c.cardPaid.filter(p => p.cardId === card.id);
-    return { card, fatura, due: dateIn(c.month, card.dueDay), paid: round2(sum(paid, p => p.amount)), payments: paid };
+    const st = c.invoices.find(i => i.cardId === card.id);
+    return { card, fatura, due: dateIn(c.month, card.dueDay), paid: round2(sum(paid, p => p.amount)), payments: paid, fromBox: st ? st.coveredPrev : 0, box: st ? st.box : 0 };
   });
 }
