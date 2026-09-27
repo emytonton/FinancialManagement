@@ -1,0 +1,100 @@
+/* Tokens do design system Bolso (tokens.json). Tema claro em :root,
+   escuro em [data-theme="dark"]; o app sempre define data-theme no <html>. */
+
+:root {
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-manrope), "Segoe UI", system-ui, sans-serif;
+
+  --bg: #f7f3f1;
+  --surface: #ffffff;
+  --surface-2: #f3eeeb;
+  --border: #e7dfdb;
+  --border-strong: #8c7f86;
+  --ink: #221a1f;
+  --ink-2: #5c5157;
+  --ink-3: #75696f;
+  --primary: #8a2f5c;
+  --primary-hover: #72264b;
+  --primary-soft: #f6e7ee;
+  --on-primary: #ffffff;
+  --focus: var(--primary);
+  --positive: #1c7a4e;
+  --positive-soft: #e2f3ea;
+  --warning: #8f5e00;
+  --warning-soft: #fbf0d9;
+  --caution: #b04a0c;
+  --caution-soft: #fce9dc;
+  --negative: #b8322a;
+  --negative-soft: #fbe7e5;
+  --card-nubank: #7433c2;
+  --on-card-nubank: #ffffff;
+  --card-mp: #f0c21b;
+  --on-card-mp: #2a2000;
+  --card-mp-strong: #9a7300;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #4a3aa7;
+  --chart-other: #a79ca2;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(34, 26, 31, 0.04), 0 8px 24px rgba(34, 26, 31, 0.05);
+  --shadow-float: 0 12px 32px rgba(138, 47, 92, 0.28);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #141012;
+  --surface: #1e181b;
+  --surface-2: #292126;
+  --border: #3a3036;
+  --border-strong: #7f7178;
+  --ink: #f6eff2;
+  --ink-2: #cdc0c7;
+  --ink-3: #a89aa1;
+  --primary: #e7a0c3;
+  --primary-hover: #f1bad5;
+  --primary-soft: #3b2130;
+  --on-primary: #2b0f1d;
+  --positive: #62cc98;
+  --positive-soft: #16301f;
+  --warning: #eab651;
+  --warning-soft: #372a10;
+  --caution: #f39556;
+  --caution-soft: #3a2215;
+  --negative: #ff8d82;
+  --negative-soft: #3c1b19;
+  --card-nubank: #b184ec;
+  --on-card-nubank: #1f0a38;
+  --card-mp: #e9bd1f;
+  --on-card-mp: #2a2000;
+  --card-mp-strong: #e9bd1f;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #9085e9;
+  --chart-other: #6f646a;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}

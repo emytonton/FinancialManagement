@@ -1,0 +1,144 @@
+// Bolso: um único usuário, então nenhuma tabela tem dono.
+// Referências entre tabelas (categoryId, sourceId...) são soltas de propósito:
+// apagar uma categoria ou fonte não apaga o histórico que apontava para ela.
+// `seq` guarda a ordem de inserção, que é a ordem mostrada nas telas.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Settings {
+  id        Int     @id @default(1)
+  name      String  @default("")
+  savePct   Int     @default(30)
+  theme     String  @default("auto")
+  lock      Boolean @default(false)
+  pin       String?
+  demo      Boolean @default(false)
+  demoToday String  @default("2026-09-26")
+}
+
+model Carry {
+  month  String  @id
+  amount Decimal @db.Decimal(12, 2)
+}
+
+model Category {
+  id    String  @id
+  seq   Int     @default(autoincrement())
+  name  String
+  icon  String
+  color String
+  mode  String
+  limit Decimal @db.Decimal(12, 2)
+  pct   Decimal @db.Decimal(5, 2)
+}
+
+model Source {
+  id       String  @id
+  seq      Int     @default(autoincrement())
+  name     String
+  icon     String
+  expected Decimal @db.Decimal(12, 2)
+  days     Int[]
+  kind     String
+  freq     String
+}
+
+model Income {
+  id       String   @id
+  seq      Int      @default(autoincrement())
+  sourceId String
+  date     DateTime @db.Date
+  amount   Decimal  @db.Decimal(12, 2)
+  note     String   @default("")
+
+  @@index([date])
+}
+
+model Transaction {
+  id         String   @id
+  seq        Int      @default(autoincrement())
+  date       DateTime @db.Date
+  desc       String
+  categoryId String
+  method     String
+  amount     Decimal  @db.Decimal(12, 2)
+  kind       String
+  total      Decimal? @db.Decimal(12, 2)
+  paidBy     String?
+  status     String?
+
+  @@index([date])
+}
+
+model Bill {
+  id         String   @id
+  seq        Int      @default(autoincrement())
+  name       String
+  amount     Decimal  @db.Decimal(12, 2)
+  day        Int
+  categoryId String
+  method     String
+  paidMonths String[]
+}
+
+model Card {
+  id       String  @id
+  seq      Int     @default(autoincrement())
+  name     String
+  limit    Decimal @db.Decimal(12, 2)
+  closeDay Int
+  dueDay   Int
+  color    String
+}
+
+model CardPayment {
+  id     String   @id
+  seq    Int      @default(autoincrement())
+  cardId String
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
+}
+
+model Installment {
+  id         String  @id
+  seq        Int     @default(autoincrement())
+  desc       String
+  cardId     String
+  categoryId String
+  amount     Decimal @db.Decimal(12, 2)
+  n          Int
+  start      String
+}
+
+model Goal {
+  id       String  @id
+  seq      Int     @default(autoincrement())
+  name     String
+  icon     String
+  target   Decimal @db.Decimal(12, 2)
+  base     Decimal @db.Decimal(12, 2)
+  deadline String?
+  monthly  Decimal @db.Decimal(12, 2)
+}
+
+model Contribution {
+  id     String   @id
+  seq    Int      @default(autoincrement())
+  goalId String
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
+}
+
+model History {
+  month    String  @id
+  receitas Decimal @db.Decimal(12, 2)
+  gastos   Decimal @db.Decimal(12, 2)
+  guardado Decimal @db.Decimal(12, 2) @default(0)
+}
