@@ -1,11 +1,16 @@
 "use client";
 import { useState } from "react";
-import { addMonths, capitalize, clamp, dateIn, dayOf, ddmm, monthLabel, monthName, monthShort, pct, round2 } from "@/lib/format";
+import { addMonths, capitalize, clamp, dateIn, dayOf, ddmm, monthLabel, monthName, monthShort, pct, round2, sum } from "@/lib/format";
 import { catColor, compute, dailySeries, goalStats, insightsFor, spendRows } from "@/lib/finance";
 import { Button, Card, EmptyState, Icon, Insight, Money, ProgressBar, Segmented, StatTile, UpcomingItem } from "../ui";
 import { BudgetBar, CashFlowChart, CategoryList, CompareBars, DonutChart, SafeToSpend } from "../finance-ui";
 import { useApp } from "../app/store";
 import { PageHead, greeting, upcomingFor } from "./common";
+
+// Uma linha "rótulo ... valor" embaixo do número de um quadrado do resumo.
+function Line({ label, value, prefix, muted }: { label: string; value: number; prefix?: string; muted?: boolean }) {
+  return <span className={"b-stat-line" + (muted ? " is-muted" : "")}><span>{label}</span><span>{prefix}<Money value={value} cents={false} /></span></span>;
+}
 
 export function Dashboard() {
   const app = useApp();
@@ -35,10 +40,27 @@ export function Dashboard() {
     <div className="b-dash">
       <div className="d-hero"><SafeToSpend c={c} /></div>
       <div className="d-tiles">
-        <StatTile icon="arrowDownLeft" tone="positive" label="Receitas" value={c.receitas} hint={c.aReceber > 0 ? <>+ <Money value={c.aReceber} cents={false} /> previstos</> : "Tudo recebido"} />
-        <StatTile icon="arrowUpRight" tone="negative" label="Gastos" value={c.gastos} hint={prevC.gastos ? <>{capitalize(prevName)}: <Money value={prevC.gastos} cents={false} /></> : null} />
-        <StatTile icon="piggy" tone="primary" label="Guardado" value={c.guardado} hint={<>Meta: <Money value={c.metaGuardar} cents={false} /> ({data.settings.savePct}%)</>} />
-        <StatTile icon="card" tone="card" label="Cartões" value={c.faturas} hint={(c.faturasTotal !== c.faturas ? "Sua parte; " : "") + "vence em " + (c.cards[0] ? ddmm(c.cards[0].due) : "--")} />
+        {/* Embaixo de cada valor, de onde ele vem. */}
+        <StatTile icon="arrowDownLeft" tone="positive" label="Receitas" value={c.receitas} hint={<>
+          {c.bySource.filter(x => x.amount > 0).map(x => <Line key={x.source.id} label={x.source.name} value={x.amount} />)}
+          {c.aReceber > 0 ? <Line label="Previsto ainda" value={c.aReceber} prefix="+ " /> : c.receitas > 0 ? <span className="b-stat-line">Tudo recebido</span> : <span className="b-stat-line">Nada recebido ainda</span>}
+        </>} />
+        <StatTile icon="arrowUpRight" tone="negative" label="Gastos" value={c.gastos} hint={<>
+          {c.gastosOrigem.cartao > 0 ? <Line label="No cartão" value={c.gastosOrigem.cartao} /> : null}
+          {c.gastosOrigem.conta > 0 ? <Line label="Pix, débito, dinheiro" value={c.gastosOrigem.conta} /> : null}
+          {c.gastosOrigem.contas > 0 ? <Line label="Contas fixas" value={c.gastosOrigem.contas} /> : null}
+          {c.gastosOrigem.outros > 0 ? <Line label="Pago por outras pessoas" value={c.gastosOrigem.outros} /> : null}
+          {prevC.gastos ? <Line label={capitalize(prevName)} value={prevC.gastos} muted /> : null}
+        </>} />
+        <StatTile icon="piggy" tone="primary" label="Guardado" value={c.guardado} hint={<>
+          <Line label={"Meta (" + data.settings.savePct + "% das receitas)"} value={c.metaGuardar} />
+          {c.metaGuardar > 0 ? (c.faltaGuardar > 0 ? <Line label="Falta guardar" value={c.faltaGuardar} /> : <span className="b-stat-line">Meta do mês cumprida</span>) : null}
+        </>} />
+        <StatTile icon="card" tone="card" label={"Cartões em " + monthName(c.month)} value={sum(c.faturasDoMes, f => f.mine)} hint={<>
+          {c.faturasDoMes.filter(f => f.mine > 0).map(f => <Line key={f.id} label={f.name + " · vence " + ddmm(f.due)} value={f.mine} />)}
+          {sum(c.faturasDoMes, f => f.mine - f.aPagar) > 0.009 ? <Line label="Pago ou na caixinha" value={round2(sum(c.faturasDoMes, f => f.mine - f.aPagar))} /> : null}
+          {c.faturasDoMes.some(f => f.total !== f.mine) ? <span className="b-stat-line">Só a sua parte (sem Mãe, Pai...)</span> : null}
+        </>} />
       </div>
       <Card className="d-flow" title="Fluxo do mês" subtitle="Seu saldo em conta dia a dia">
         <CashFlowChart actual={series.actual} proj={series.proj} days={c.days} todayD={c.month === c.tm ? dayOf(c.today) : null} />
@@ -70,15 +92,19 @@ export function Dashboard() {
       <Card className="d-cards" title="Cartões" action={<Button variant="ghost" size="sm" onClick={() => app.go("cartoes")}>Detalhes</Button>}>
         {c.cards.length ? (
           <div className="b-stack-list">
-            {c.cards.map(k => (
-              <div key={k.id} className="b-minicard">
-                <div className="b-minicard-top"><span className={"b-dot b-dot-lg is-" + k.color} /><strong>{k.name}</strong><span className="b-muted">{"vence " + ddmm(k.due)}</span></div>
-                <div className="b-minicard-vals"><Money value={k.faturaMinha} className="b-strong" /><span className="b-muted">{k.faturaTerceiros > 0 ? " sua parte" : " fatura"} · {pct(k.ratio)} do limite</span></div>
-                {k.caixinha > 0 ? <div className="b-muted b-small"><Money value={k.caixinha} /> na caixinha · restam <Money value={k.restante} className="b-strong" /></div> : null}
-                <div className="b-progress" style={{ height: 8 }}><div className={"b-progress-fill b-fill-card is-" + k.color} style={{ width: clamp(k.ratio, 0, 1) * 100 + "%" }} /></div>
-              </div>
-            ))}
-            <div className="b-total-row"><span>{c.faturasTotal !== c.faturas ? "Sua parte nas faturas" : "Total nas faturas"}</span><Money value={c.faturas} className="b-strong" /></div>
+            {c.faturasDoMes.map(f => {
+              const k = c.cards.find(x => x.id === f.id)!;
+              return (
+                <div key={f.id} className="b-minicard">
+                  <div className="b-minicard-top"><span className={"b-dot b-dot-lg is-" + f.color} /><strong>{f.name}</strong><span className="b-muted">{"vence " + ddmm(f.due)}</span></div>
+                  <div className="b-minicard-vals"><Money value={f.mine} className="b-strong" /><span className="b-muted">{f.total !== f.mine ? " sua parte" : " fatura"} · {pct(k.ratio)} do limite</span></div>
+                  {f.mine - f.aPagar > 0.009 ? <div className="b-muted b-small"><Money value={round2(f.mine - f.aPagar)} /> pago ou na caixinha · falta <Money value={f.aPagar} className="b-strong" /></div> : null}
+                  <div className="b-progress" style={{ height: 8 }}><div className={"b-progress-fill b-fill-card is-" + f.color} style={{ width: clamp(k.ratio, 0, 1) * 100 + "%" }} /></div>
+                </div>
+              );
+            })}
+            <div className="b-total-row"><span>{"A pagar em " + monthName(c.month)}</span><Money value={round2(sum(c.faturasDoMes, f => f.aPagar))} className="b-strong" /></div>
+            {c.faturasReservadas > 0 && c.cards[0] ? <p className="b-muted b-small">Próxima: <Money value={c.faturasReservadas} /> vence {ddmm(c.cards[0].due)}.</p> : null}
           </div>
         ) : <EmptyState icon="card" title="Nenhum cartão" action={<Button size="sm" onClick={() => app.openForm("card")}>Adicionar cartão</Button>} />}
       </Card>

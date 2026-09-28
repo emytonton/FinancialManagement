@@ -1,6 +1,6 @@
 "use client";
 import { ddmm, monthLabel, sum } from "@/lib/format";
-import { compute } from "@/lib/finance";
+import { compute, incomeName } from "@/lib/finance";
 import { Badge, Button, Card, EmptyState, Icon, IconButton, Money, MoneyInput, TransactionRow } from "../ui";
 import { IncomeSplit, TrendBars } from "../finance-ui";
 import { useApp } from "../app/store";
@@ -29,7 +29,7 @@ export function Income() {
           <div className="b-list">
             {c.incomes.map(i => {
               const s = data.sources.find(x => x.id === i.sourceId);
-              return <TransactionRow key={i.id} income tx={{ desc: (s ? s.name : "Entrada") + (i.note ? " · " + i.note : ""), amount: i.amount }} onClick={() => app.openForm("income", i)} onDelete={() => app.askDelete("incomes", i.id, "Entrada")} />;
+              return <TransactionRow key={i.id} income tx={{ desc: s ? s.name + (i.note ? " · " + i.note : "") : incomeName(data, i), amount: i.amount }} onClick={() => app.openForm("income", i)} onDelete={() => app.askDelete("incomes", i.id, "Entrada")} />;
             })}
             {c.expected.map((e, k) => (
               <div key={"e" + k} className="b-expected">

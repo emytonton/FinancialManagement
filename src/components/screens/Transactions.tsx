@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { addMonths, cx, dateIn, ddmm, monthLabel, sum, weekday, ym } from "@/lib/format";
-import { billsFor, debtsFor, parcelInfo } from "@/lib/finance";
+import { billsFor, debtsFor, incomeName, parcelInfo } from "@/lib/finance";
 import type { Category, Tx } from "@/lib/types";
 import { Button, Card, EmptyState, Icon, Money, Segmented, Select, TransactionRow, type RowTx } from "../ui";
 import { useApp } from "../app/store";
@@ -34,9 +34,8 @@ export function Transactions({ dir: initialDir, flag: initialFlag }: { dir?: str
     edit: () => app.openEdit("gasto", data.txs.find(t => t.id === x.id) as unknown as Record<string, unknown>), del: () => app.askDelete("txs", x.id, "Gasto"),
   }));
   data.incomes.filter(x => inP(x.date)).forEach(x => {
-    const s = data.sources.find(k => k.id === x.sourceId);
     items.push({
-      key: "in" + x.id, date: x.date, income: true, tx: { desc: s ? s.name : "Entrada", amount: x.amount, method: "" },
+      key: "in" + x.id, date: x.date, income: true, tx: { desc: incomeName(data, x), amount: x.amount, method: "" },
       edit: () => app.openEdit("receita", { ...x, desc: x.note }), del: () => app.askDelete("incomes", x.id, "Entrada"),
     });
   });

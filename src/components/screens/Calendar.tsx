@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { dateIn, dayOf, monthName, pad } from "@/lib/format";
-import { debtsFor, dueInvoices, type MonthBill } from "@/lib/finance";
+import { debtsFor, dueInvoices, incomeName, type MonthBill } from "@/lib/finance";
 import { Button, Card, EmptyState, IconButton, Money, Segmented, UpcomingItem } from "../ui";
 import { CalendarMonth, EVENT_TYPES } from "../finance-ui";
 import { useApp } from "../app/store";
@@ -14,7 +14,7 @@ export function Calendar() {
   const { data, c } = app;
   const [sel, setSel] = useState(c.month === c.tm ? dayOf(c.today) : 1);
   const events: Ev[] = [];
-  c.incomes.forEach(i => { const s = data.sources.find(x => x.id === i.sourceId); events.push({ date: i.date, type: "income", label: s ? s.name : "Entrada", amount: i.amount }); });
+  c.incomes.forEach(i => events.push({ date: i.date, type: "income", label: incomeName(data, i), amount: i.amount }));
   c.expected.forEach(e => events.push({ date: e.date, type: "income", label: e.source.name + " (previsto)", amount: e.amount }));
   c.bills.forEach(b => events.push({ date: b.date, type: "bill", label: b.name, amount: b.amount, status: b.status }));
   dueInvoices(data, c).forEach(inv => {

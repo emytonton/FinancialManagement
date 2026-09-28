@@ -302,6 +302,9 @@ export function thirdPartyFor(data: Data, month: string, today: string): ThirdPa
 // Dívida = sua parte nas compras compartilhadas pendentes. Pagamentos (repayments) abatem
 // do saldo de cada pessoa, cobrindo primeiro as compras mais antigas.
 // Compras antigas marcadas como "reembolsado" (antes desta aba) contam como já quitadas.
+// Nome de uma entrada: a fonte, ou a descrição quando é avulsa.
+export const incomeName = (data: Data, i: Income) => data.sources.find(s => s.id === i.sourceId)?.name ?? (i.note || "Entrada avulsa");
+
 export const personKey = (name?: string) => (name || "").trim().toLowerCase();
 
 export type DebtItem = { tx: Tx; paid: number; open: number };
@@ -371,6 +374,14 @@ export function compute(data: Data, month: string, today: string) {
   // Gastos de outras pessoas ficam fora de todas as métricas (gastos, orçamento, gráficos, insights).
   const expenses = allExpenses.filter(e => mine(e.categoryId));
   const gastos = round2(sum(expenses, e => e.amount));
+  // De onde vieram os gastos do mês (para o resumo do Início).
+  const cardSet = cardIdsOf(data);
+  const gastosOrigem = {
+    cartao: round2(sum(expenses.filter(e => cardSet.has(e.method) && !(e.src === "tx" && (e.ref as Tx).kind === "compartilhado")), e => e.amount)),
+    conta: round2(sum(expenses.filter(e => e.src === "tx" && !cardSet.has(e.method) && (e.ref as Tx).kind !== "compartilhado"), e => e.amount)),
+    contas: round2(sum(expenses.filter(e => e.src === "bill" && !cardSet.has(e.method)), e => e.amount)),
+    outros: round2(sum(expenses.filter(e => e.src === "tx" && (e.ref as Tx).kind === "compartilhado"), e => e.amount)),
+  };
 
   const byCat: Record<string, number> = {};
   expenses.forEach(e => { byCat[e.categoryId] = (byCat[e.categoryId] || 0) + e.amount; });
@@ -422,6 +433,15 @@ export function compute(data: Data, month: string, today: string) {
   const faturasAbertas = round2(sum(invoices, i => i.prevOpen - i.coveredPrev));
   const caixinhasNasFaturas = round2(sum(invoices, i => i.coveredPrev + i.coveredCur));
   const caixinhas = round2(sum(data.boxes, b => b.amount));
+  // Faturas que vencem NESTE mês (compras do mês anterior), por cartão: é o que entra no livre do mês.
+  const faturasDoMes = cards.map(k => {
+    const st = invoices.find(i => i.cardId === k.id)!;
+    return {
+      id: k.id, name: k.name, color: k.color, due: dateIn(month, k.dueDay),
+      total: cardInvoice(data, k, prevMonth, today), mine: cardInvoice(data, k, prevMonth, today, true),
+      paid: round2(sum(cardPaid.filter(p => p.cardId === k.id), p => p.amount)), box: st.coveredPrev, aPagar: round2(st.prevOpen - st.coveredPrev),
+    };
+  });
 
   const contribs: Contribution[] = data.contributions.filter(inMonth);
   const guardado = round2(sum(contribs, c => c.amount));
@@ -458,12 +478,15 @@ export function compute(data: Data, month: string, today: string) {
   });
   const aReceber = round2(sum(expected, e => e.amount));
   const bySource = data.sources.map(s => ({ source: s, amount: round2(sum(incomes.filter(i => i.sourceId === s.id), i => i.amount)) }));
+  // Entradas sem fonte (Pix da avó, presente...) aparecem juntas como "Outras entradas".
+  const avulsas = round2(sum(incomes.filter(i => !data.sources.some(s => s.id === i.sourceId)), i => i.amount));
+  if (avulsas > 0) bySource.push({ source: { id: "_avulsa", name: "Outras entradas", icon: "gift", expected: 0, days: [], kind: "variavel", freq: "eventual" }, amount: avulsas });
 
   const prev = addMonths(month, -1);
   return {
     month, today, tm, receitas, carry, incomes, txs, expenses, gastos, byCat, catById, bills, pendingBills, contasAVencer,
     reembolsos, reembolsoTotal, repaid, cards, faturas, faturasTotal, faturasReservadas, faturasAbertas, invoices, caixinhasNasFaturas, caixinhas, cardPaid, personReceived, terceiros, contribs, guardado, metaGuardar, faltaGuardar, emConta, livre,
-    days, daysLeft, porDia, budgets, orcado, expected, aReceber, bySource, parcels, prev,
+    days, daysLeft, porDia, budgets, orcado, expected, aReceber, bySource, parcels, prev, faturasDoMes, gastosOrigem,
   };
 }
 

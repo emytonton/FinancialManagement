@@ -48,3 +48,9 @@ body {
 .b-boxchip .b-money { font-weight: 700; }
 .is-mobile .d-boxes { order: 8; }
 .is-mobile .b-boxstrip { grid-template-columns: 1fr 1fr; }
+
+/* Linhas "de onde vem" embaixo dos valores do resumo */
+.b-stat-line { display: flex; justify-content: space-between; gap: var(--space-2); }
+.b-stat-line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-stat-line.is-muted { opacity: .75; }
+.b-stat-hint { display: flex; flex-direction: column; gap: 2px; }

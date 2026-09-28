@@ -177,7 +177,7 @@ export function FormHost() {
   const def = FORMS[form.kind === "bill" && form.item?.kind === "assinatura" ? "subscription" : form.kind];
   const fields = def.fields.map(x => {
     if (x.key === "categoryId") return { ...x, options: data.categories.map(c => ({ value: c.id, label: c.name })) };
-    if (x.key === "sourceId") return { ...x, options: data.sources.map(s => ({ value: s.id, label: s.name })) };
+    if (x.key === "sourceId") return { ...x, options: [...data.sources.map(s => ({ value: s.id, label: s.name })), { value: "", label: "Outra entrada (use a observação)" }] };
     if (x.key === "goalId") return { ...x, options: data.goals.map(g => ({ value: g.id, label: g.name })) };
     if (x.key === "cardId") return { ...x, options: [...(form.kind === "box" ? [{ value: "", label: "Nada (só dinheiro separado)" }] : []), ...data.cards.map(c => ({ value: c.id, label: form.kind === "box" ? "Fatura " + c.name : c.name }))] };
     if (x.key === "method") return { ...x, options: app.methods.map(m => ({ value: m.id, label: m.name })) };
@@ -214,7 +214,7 @@ function endedMsg(data: Data, inst: Installment, month: string) {
 
 type AddValues = {
   amount: number; categoryId: string; desc: string; method: string; date: string; kind: "pessoal" | "compartilhado" | "fixa";
-  parcelado: boolean; n: number; total: number; paidBy: string; status: "pendente" | "reembolsado"; sourceId: string; goalId: string;
+  parcelado: boolean; n: number; total: number; paidBy: string; status: "pendente" | "reembolsado"; sourceId: string; goalId: string; boxId: string;
 };
 
 // Monta do zero a cada abertura, então o estado inicial vem direto do que foi pedido.
@@ -231,7 +231,7 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
   const [v, setV] = useState<AddValues>(() => {
     const blank: AddValues = {
       amount: 0, categoryId: data.categories[0]?.id || "", desc: "", method: "pix", date: app.defaultDate, kind: "pessoal",
-      parcelado: false, n: 2, total: 0, paidBy: "", status: "pendente", sourceId: data.sources[0]?.id || "", goalId: data.goals[0]?.id || "",
+      parcelado: false, n: 2, total: 0, paidBy: "", status: "pendente", sourceId: data.sources[0]?.id || "", goalId: "", boxId: "",
     };
     if (edit) return { ...blank, ...(edit.item as Partial<AddValues>), desc: String(edit.item.desc ?? edit.item.note ?? "") };
     return { ...blank, ...(add.preset as Partial<AddValues>) };
@@ -269,13 +269,16 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
         app.toast(edit ? "Gasto atualizado" : "Gasto adicionado");
       }
     } else if (tab === "receita") {
-      if (!v.sourceId) { setErr("Cadastre uma fonte de renda antes."); return; }
-      app.upsert("incomes", { id: editId || uid(), sourceId: v.sourceId, date: v.date, amount: round2(v.amount), note: v.desc || "" });
+      // Sem fonte (sourceId vazio) = entrada avulsa, ex.: Pix da avó. A descrição vira o nome.
+      if (!v.sourceId && !v.desc.trim()) { setErr("Diga de onde veio (ex.: Pix da vó)."); return; }
+      app.upsert("incomes", { id: editId || uid(), sourceId: v.sourceId, date: v.date, amount: round2(v.amount), note: v.desc.trim() });
       app.toast("Entrada registrada. Percentuais do mês recalculados.");
     } else {
-      if (!v.goalId) { setErr("Crie uma meta antes."); return; }
+      // Sem meta (goalId vazio) conta só para a meta de guardar do mês.
       app.upsert("contributions", { id: editId || uid(), goalId: v.goalId, date: v.date, amount: round2(v.amount) });
-      app.toast("Valor guardado na meta");
+      const box = data.boxes.find(b => b.id === v.boxId);
+      if (box && !edit) app.upsert("boxes", { ...box, amount: round2(box.amount + v.amount) });
+      app.toast("Guardado" + (box && !edit ? " na caixinha " + box.name : ""));
     }
     close();
   };
@@ -357,35 +360,51 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
         </div>
       </> : tab === "receita" ? (
         <div className="b-form">
-          <Field label="Fonte">
-            {data.sources.length ? (
-              <div className="b-chips">
-                {data.sources.map(s => (
-                  <button key={s.id} type="button" className={cx("b-chip", v.sourceId === s.id && "is-on")} onClick={() => set({ sourceId: s.id })}>
-                    <Icon name={s.icon || "briefcase"} size={16} />{s.name}
-                  </button>
-                ))}
-              </div>
-            ) : <p className="b-muted b-small">Cadastre uma fonte de renda na tela Receitas.</p>}
+          <Field label="De onde veio">
+            <div className="b-chips">
+              {data.sources.map(s => (
+                <button key={s.id} type="button" className={cx("b-chip", v.sourceId === s.id && "is-on")} onClick={() => set({ sourceId: s.id })}>
+                  <Icon name={s.icon || "briefcase"} size={16} />{s.name}
+                </button>
+              ))}
+              <button type="button" className={cx("b-chip", !v.sourceId && "is-on")} onClick={() => set({ sourceId: "" })}>
+                <Icon name="gift" size={16} />Outra entrada
+              </button>
+            </div>
           </Field>
           {src && perSource > 0 ? <button type="button" className="b-linkbtn" onClick={() => { set({ amount: perSource }); setAmtRev(r => r + 1); }}>Usar valor previsto: {fmt(perSource)}</button> : null}
           <Field label="Data" className="is-half"><Input type="date" value={v.date} onChange={e => set({ date: e.target.value })} /></Field>
-          <Field label="Observação" className="is-half"><Input value={v.desc} placeholder="Opcional" onChange={e => set({ desc: e.target.value })} /></Field>
+          <Field label={v.sourceId ? "Observação" : "Descrição"} className="is-half">
+            <Input value={v.desc} placeholder={v.sourceId ? "Opcional" : "Ex.: Pix da vó"} onChange={e => set({ desc: e.target.value })} />
+          </Field>
           {v.amount > 0 ? <Notice tone="neutral" icon="piggy">Com {data.settings.savePct}% para guardar, {fmt(v.amount * data.settings.savePct / 100)} desta entrada vão para a sua meta do mês.</Notice> : null}
         </div>
       ) : (
         <div className="b-form">
-          <Field label="Meta">
-            {data.goals.length ? (
+          <Field label="Para qual meta" hint={v.goalId ? undefined : "Conta para a sua meta de guardar " + data.settings.savePct + "% do mês."}>
+            <div className="b-chips">
+              <button type="button" className={cx("b-chip", !v.goalId && "is-on")} onClick={() => set({ goalId: "" })}>
+                <Icon name="piggy" size={16} />Guardar do mês
+              </button>
+              {data.goals.map(g => (
+                <button key={g.id} type="button" className={cx("b-chip", v.goalId === g.id && "is-on")} onClick={() => set({ goalId: g.id })}>
+                  <Icon name={g.icon || "target"} size={16} />{g.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+          {!edit && data.boxes.some(b => !b.cardId) ? (
+            <Field label="Onde o dinheiro ficou" hint={v.boxId ? "O valor é somado nessa caixinha." : "Escolha a caixinha para ela já ficar atualizada."}>
               <div className="b-chips">
-                {data.goals.map(g => (
-                  <button key={g.id} type="button" className={cx("b-chip", v.goalId === g.id && "is-on")} onClick={() => set({ goalId: g.id })}>
-                    <Icon name={g.icon || "target"} size={16} />{g.name}
+                <button type="button" className={cx("b-chip", !v.boxId && "is-on")} onClick={() => set({ boxId: "" })}>Não informar</button>
+                {data.boxes.filter(b => !b.cardId).map(b => (
+                  <button key={b.id} type="button" className={cx("b-chip", v.boxId === b.id && "is-on")} onClick={() => set({ boxId: b.id })}>
+                    <Icon name={b.icon || "piggy"} size={16} />{b.name}
                   </button>
                 ))}
               </div>
-            ) : <p className="b-muted b-small">Crie uma meta na tela Metas.</p>}
-          </Field>
+            </Field>
+          ) : null}
           <Field label="Data" className="is-half"><Input type="date" value={v.date} onChange={e => set({ date: e.target.value })} /></Field>
         </div>
       )}
