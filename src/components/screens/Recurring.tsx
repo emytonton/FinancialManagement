@@ -5,6 +5,7 @@ import { billActive, billAmount, billTypeOf, billsFor, type MonthBill } from "@/
 import type { Bill } from "@/lib/types";
 import { Badge, Button, Card, EmptyState, Field, Icon, IconButton, Money, MoneyInput, Sheet } from "../ui";
 import { useApp } from "../app/store";
+import { payBill, unpayBill } from "../app/bills";
 import { PageHead } from "./common";
 
 const monthTxt = (m: string) => monthShort(m) + "/" + m.slice(2, 4);
@@ -26,19 +27,10 @@ export function Recurring() {
 
   const confirmPay = () => {
     if (!paying) return;
-    const b = original(paying.bill.id);
-    app.upsert("bills", { ...b, paid: { ...b.paid, [c.month]: true }, amounts: { ...(b.amounts || {}), [c.month]: round2(paying.value) } });
-    app.toast(b.name + " de " + monthName(c.month) + " marcada como paga");
+    payBill(app, paying.bill.id, c.month, paying.value);
     setPaying(null);
   };
-  const unpay = (id: string) => {
-    const b = original(id);
-    const paid = { ...b.paid };
-    const amounts = { ...(b.amounts || {}) };
-    delete paid[c.month];
-    delete amounts[c.month];
-    app.upsert("bills", { ...b, paid, amounts });
-  };
+  const unpay = (id: string) => unpayBill(app, id, c.month);
   const methodTxt = (b: Bill) => app.methodName(b.method);
 
   return <>

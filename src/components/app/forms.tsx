@@ -151,12 +151,16 @@ const FORMS: Record<FormKind, FormDef> = {
   box: { title: "Caixinha", coll: "boxes", fields: [
     { key: "name", label: "Nome", required: true, placeholder: "Ex.: Reserva" },
     { key: "amount", label: "Valor disponível", type: "money", hint: "Quanto tem nela agora. Atualize sempre que guardar ou tirar dinheiro." },
-    { key: "cardId", label: "Reservada para pagar", type: "select", hint: "Ligada a um cartão, o valor abate da fatura dele." },
+    { key: "moveMode", label: "Essa diferença", type: "seg", show: v => round2(Number(v.amount) || 0) !== round2(Number(v._orig) || 0),
+      options: [{ value: "conta", label: "Passei da/para a conta" }, { value: "ajuste", label: "Rendimento ou ajuste" }],
+      hint: v => v.moveMode === "conta" ? "O saldo em conta acompanha: sai da conta o que entrou na caixinha (ou volta, se tirou)." : "Não mexe no saldo em conta (ex.: rendimento da caixinha)." },
+    { key: "cardId", label: "Reservada para pagar", type: "select", hint: "Ligada a uma fatura ou às contas fixas, o valor abate do que você tem a pagar." },
     { key: "icon", label: "Ícone", type: "select", options: ICON_OPTIONS }],
-    blank: () => ({ id: uid(), name: "", amount: 0, cardId: "", icon: "piggy" }),
-    load: b => ({ ...b, cardId: b.cardId || "" }),
+    blank: () => ({ id: uid(), name: "", amount: 0, cardId: "", icon: "piggy", _orig: 0, moveMode: "conta" }),
+    // "__contas" no seletor = caixinha das contas fixas.
+    load: b => ({ ...b, cardId: b.forBills ? "__contas" : b.cardId || "", _orig: b.amount, moveMode: "conta" }),
     // undefined (e não ausente) para desligar do cartão ao editar.
-    save: b => ({ ...b, amount: Number(b.amount) || 0, cardId: b.cardId || undefined }) },
+    save: ({ _orig, moveMode, ...b }) => { void _orig; void moveMode; return { ...b, amount: Number(b.amount) || 0, forBills: b.cardId === "__contas", cardId: b.cardId && b.cardId !== "__contas" ? b.cardId : undefined }; } },
   repayment: { title: "Pagamento", coll: "repayments", fields: [
     { key: "person", label: "Para quem", required: true, placeholder: "Ex.: Namorado" },
     { key: "amount", label: "Quanto você mandou", type: "money", required: true, half: true },
@@ -179,7 +183,7 @@ export function FormHost() {
     if (x.key === "categoryId") return { ...x, options: data.categories.map(c => ({ value: c.id, label: c.name })) };
     if (x.key === "sourceId") return { ...x, options: [...data.sources.map(s => ({ value: s.id, label: s.name })), { value: "", label: "Outra entrada (use a observação)" }] };
     if (x.key === "goalId") return { ...x, options: data.goals.map(g => ({ value: g.id, label: g.name })) };
-    if (x.key === "cardId") return { ...x, options: [...(form.kind === "box" ? [{ value: "", label: "Nada (só dinheiro separado)" }] : []), ...data.cards.map(c => ({ value: c.id, label: form.kind === "box" ? "Fatura " + c.name : c.name }))] };
+    if (x.key === "cardId") return { ...x, options: [...(form.kind === "box" ? [{ value: "", label: "Nada (só dinheiro separado)" }, { value: "__contas", label: "Contas fixas" }] : []), ...data.cards.map(c => ({ value: c.id, label: form.kind === "box" ? "Fatura " + c.name : c.name }))] };
     if (x.key === "method") return { ...x, options: app.methods.map(m => ({ value: m.id, label: m.name })) };
     if (form.kind === "installment" && x.key === "date") return { ...x, hint: (v: Values) => invoiceHint(data, String(v.cardId || ""), String(v.date || ""), "1ª parcela na fatura que vence em ") };
     return x;
@@ -191,6 +195,11 @@ export function FormHost() {
       onSave={v => {
         const o = def.save ? def.save(v, data) : v;
         app.upsert(def.coll, { ...(form.item || {}), ...o } as never);
+        // Caixinha: a diferença de valor "passada da/para a conta" vira uma transferência.
+        if (form.kind === "box" && v.moveMode === "conta") {
+          const diff = round2((Number(v.amount) || 0) - (Number(v._orig) || 0));
+          if (diff !== 0) app.upsert("boxMoves", { id: uid(), boxId: String(v.id), date: app.today, amount: diff });
+        }
         app.toast((def.coll === "installments" && endedMsg(data, { ...(form.item || {}), ...o } as unknown as Installment, app.month)) || (form.item ? "Alterações salvas" : "Adicionado"));
       }}
       onDelete={form.item ? v => app.askDelete(def.coll, String(v.id), def.title) : undefined} />
@@ -393,11 +402,11 @@ function AddSheetBody({ add }: { add: NonNullable<AddState> }) {
               ))}
             </div>
           </Field>
-          {!edit && data.boxes.some(b => !b.cardId) ? (
+          {!edit && data.boxes.some(b => !b.cardId && !b.forBills) ? (
             <Field label="Onde o dinheiro ficou" hint={v.boxId ? "O valor é somado nessa caixinha." : "Escolha a caixinha para ela já ficar atualizada."}>
               <div className="b-chips">
                 <button type="button" className={cx("b-chip", !v.boxId && "is-on")} onClick={() => set({ boxId: "" })}>Não informar</button>
-                {data.boxes.filter(b => !b.cardId).map(b => (
+                {data.boxes.filter(b => !b.cardId && !b.forBills).map(b => (
                   <button key={b.id} type="button" className={cx("b-chip", v.boxId === b.id && "is-on")} onClick={() => set({ boxId: b.id })}>
                     <Icon name={b.icon || "piggy"} size={16} />{b.name}
                   </button>

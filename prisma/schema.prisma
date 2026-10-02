@@ -98,6 +98,8 @@ model Bill {
   end        String?
   // Valor efetivo de cada mês quando difere do previsto: { "2026-09": 132.4 }.
   amounts    Json     @default("{}")
+  // Quanto do pagamento de cada mês saiu da caixinha de contas: { "2026-10": 30 }.
+  fromBox    Json     @default("{}")
 }
 
 model Card {
@@ -179,6 +181,8 @@ model Box {
   icon   String
   amount Decimal @db.Decimal(12, 2)
   cardId String?
+  // Reservada para pagar as contas fixas: abate de "Contas a vencer".
+  forBills Boolean @default(false)
 }
 
 // Dinheiro que você devolveu para quem pagou compras por você (ex.: namorado no mercado).
@@ -190,4 +194,13 @@ model Repayment {
   date   DateTime @db.Date
   amount Decimal  @db.Decimal(12, 2)
   note   String   @default("")
+}
+
+// Dinheiro que passou da conta para uma caixinha (amount > 0) ou voltou dela para a conta (amount < 0).
+model BoxMove {
+  id     String   @id
+  seq    Int      @default(autoincrement())
+  boxId  String
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
 }

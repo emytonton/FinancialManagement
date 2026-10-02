@@ -19,12 +19,17 @@ export type BillKind = "conta" | "assinatura";
 export interface Bill {
   id: string; name: string; amount: number; day: number; categoryId: string; method: string; paid: Record<string, boolean>;
   kind?: BillKind; type?: string; start?: string; end?: string; amounts?: Record<string, number>;
+  // Parte do pagamento de cada mês que saiu da caixinha de contas (não sai da conta).
+  fromBox?: Record<string, number>;
 }
 export interface CreditCard { id: string; name: string; limit: number; closeDay: number; dueDay: number; color: CardColor }
 // fromBox = parte paga com a caixinha do cartão (não sai do saldo da conta).
 export interface CardPayment { id: string; cardId: string; date: string; amount: number; fromBox?: number }
 // Caixinha: dinheiro separado, fora do saldo da conta. Com cardId, está reservado para a fatura desse cartão.
-export interface Box { id: string; name: string; icon: string; amount: number; cardId?: string }
+// forBills: reservada para as contas fixas (abate de "Contas a vencer").
+export interface Box { id: string; name: string; icon: string; amount: number; cardId?: string; forBills?: boolean }
+// Transferência entre a conta e uma caixinha: amount > 0 saiu da conta, < 0 voltou para a conta.
+export interface BoxMove { id: string; boxId: string; date: string; amount: number }
 // start = mês da 1ª parcela (fatura). Com date (dia da compra), start é recalculado pelo fechamento do cartão.
 export interface Installment { id: string; desc: string; cardId: string; categoryId: string; amount: number; n: number; start: string; date?: string }
 export interface Goal { id: string; name: string; icon: string; target: number; base: number; deadline: string; monthly: number }
@@ -45,9 +50,9 @@ export interface Data {
   carry: Record<string, number>;
   categories: Category[]; sources: Source[]; incomes: Income[]; txs: Tx[]; bills: Bill[];
   cards: CreditCard[]; cardPayments: CardPayment[]; installments: Installment[];
-  goals: Goal[]; contributions: Contribution[]; personPayments: PersonPayment[]; boxes: Box[]; repayments: Repayment[]; history: HistoryRow[];
+  goals: Goal[]; contributions: Contribution[]; personPayments: PersonPayment[]; boxes: Box[]; boxMoves: BoxMove[]; repayments: Repayment[]; history: HistoryRow[];
 }
 
-export type Collection = "categories" | "sources" | "incomes" | "txs" | "bills" | "cards" | "cardPayments" | "installments" | "goals" | "contributions" | "personPayments" | "boxes" | "repayments";
+export type Collection = "categories" | "sources" | "incomes" | "txs" | "bills" | "cards" | "cardPayments" | "installments" | "goals" | "contributions" | "personPayments" | "boxes" | "boxMoves" | "repayments";
 
 export type ItemOf<C extends Collection> = Data[C][number];

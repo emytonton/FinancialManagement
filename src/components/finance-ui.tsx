@@ -1,7 +1,7 @@
 "use client";
 // Componentes que mostram os números do mês: herói, gráficos, cartões, metas.
 import { useEffect, useRef, useState } from "react";
-import { addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, monthLabel, monthName, monthShort, pad, pct, round2, sum, WEEK } from "@/lib/format";
+import { addMonths, clamp, cx, dateIn, dayOf, ddmm, dim, fmt, monthLabel, monthName, monthShort, pad, pct, round2, sum, WEEK } from "@/lib/format";
 import { parcelInfo, stateOf, type Budget, type GoalStats, type Month, type MonthCard, type Point, type SpendRow } from "@/lib/finance";
 import type { Goal, Installment, Source } from "@/lib/types";
 import { Badge, Button, CatIcon, EmptyState, Icon, Money, ProgressBar, RowActions } from "./ui";
@@ -38,7 +38,7 @@ export function BudgetBar({ budget, onClick, compact }: { budget: Budget; onClic
 export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
   const parts = [
     { key: "faturas", label: "Faturas que vencem em " + monthName(c.month), hint: c.cards.length ? ("vence " + ddmm(dateIn(c.month, c.cards[0].dueDay)) + (c.invoices.some(i => i.coveredPrev > 0) ? ", já tirando a caixinha" : "") + "; toque Paguei em Cartões ao pagar") : "sem cartões", value: c.faturasAbertas, o: 1 },
-    { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s"), value: c.contasAVencer, o: 0.72 },
+    { key: "contas", label: "Contas a vencer", hint: c.pendingBills.length + " conta" + (c.pendingBills.length === 1 ? "" : "s") + (c.contasCobertas > 0 ? "; já tirando " + fmt(c.contasCobertas) + " da caixinha" : ""), value: round2(c.contasAVencer - c.contasCobertas), o: 0.72 },
     { key: "reemb", label: "Você deve a outras pessoas", hint: c.reembolsos.length ? c.reembolsos.map(r => r.desc).join(", ") + " · veja em Reembolsos" : "nada pendente", value: sum(c.reembolsos, x => x.amount), o: 0.5 },
     { key: "guardar", label: "Falta guardar", hint: "meta de " + pct(c.metaGuardar / (c.receitas || 1)), value: c.faltaGuardar, o: 0.3 },
   ];
@@ -59,7 +59,7 @@ export function SafeToSpend({ c, compact }: { c: Month; compact?: boolean }) {
       </div>
       <div className="b-hero-break">
         <div className="b-waterfall-head"><span>Em conta agora</span><Money value={c.emConta} className="b-strong" /></div>
-        {c.caixinhas > 0 ? <p className="b-hero-note"><Icon name="piggy" size={14} /><span>Fora da conta: <Money value={c.caixinhas} /> em caixinhas{c.caixinhasNasFaturas > 0 ? <>, <Money value={c.caixinhasNasFaturas} /> delas já pagando faturas</> : null}.</span></p> : null}
+        {c.caixinhas > 0 ? <p className="b-hero-note"><Icon name="piggy" size={14} /><span>Fora da conta: <Money value={c.caixinhas} /> em caixinhas{c.caixinhasNasFaturas + c.contasCobertas > 0 ? <>, <Money value={round2(c.caixinhasNasFaturas + c.contasCobertas)} /> delas já pagando faturas e contas</> : null}.</span></p> : null}
         <div className="b-stack" role="img" aria-label="Divisão do saldo em conta">
           {parts.filter(p => p.value > 0).map(p => <span key={p.key} className="b-stack-seg b-seg-commit" style={{ flexGrow: p.value / total, opacity: p.o }} title={p.label} />)}
           {free > 0 ? <span className="b-stack-seg b-seg-free" style={{ flexGrow: free / total }} title="Livre" /> : null}

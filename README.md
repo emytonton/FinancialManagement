@@ -37,7 +37,9 @@ No "livre para gastar", da fatura só sai a sua parte enquanto a pessoa não te 
 Dinheiro separado fora do saldo da conta (como as caixinhas do Mercado Pago). Cada caixinha guarda só o valor disponível, editável a qualquer momento.
 
 - **Ligada a um cartão** (ex.: Cartão Nubank): o valor abate da fatura desse cartão. Primeiro cobre a fatura anterior ainda aberta, depois a atual. Fatura − caixinha = restante a pagar, e só o restante sai do "livre para gastar". Ao marcar **Paguei**, o app usa primeiro a caixinha (e tira o valor dela) e o resto sai da conta.
-- **Sem cartão** (ex.: Reserva, Academia): só aparece como dinheiro reservado; não mexe no livre nem nas faturas.
+- **Contas fixas** (ex.: Contas de Casa): o valor abate de "Contas a vencer". Ao marcar uma conta como paga, o app usa primeiro essa caixinha.
+- **Sem destino** (ex.: Reserva, Academia): só aparece como dinheiro reservado; não mexe no livre nem nas faturas.
+- Ao mudar o valor de uma caixinha, escolha se a diferença **passou da/para a conta** (o saldo em conta acompanha) ou é **rendimento/ajuste** (não mexe no saldo).
 
 ## Assinaturas e contas fixas
 

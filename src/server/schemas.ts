@@ -35,6 +35,7 @@ export const schemas = {
     start: z.union([month, z.literal("")]).optional(),
     end: z.union([month, z.literal("")]).optional(),
     amounts: z.record(month, money).default({}),
+    fromBox: z.record(month, money).default({}),
   }),
   cards: z.object({
     id, name: text(40).min(1), limit: money, closeDay: dayOfMonth, dueDay: dayOfMonth, color: z.enum(["nubank", "mp"]),
@@ -52,7 +53,8 @@ export const schemas = {
   contributions: z.object({ id, goalId: z.string().max(64), date: day, amount: money }),
   personPayments: z.object({ id, categoryId: z.string().max(64), month, date: day, amount: money }),
   repayments: z.object({ id, person: text(60).min(1), date: day, amount: money, note: text(200).default("") }),
-  boxes: z.object({ id, name: text(60).min(1), icon: text(30), amount: z.number().finite().min(-1e9).max(1e9), cardId: z.string().max(64).optional() }),
+  boxes: z.object({ id, name: text(60).min(1), icon: text(30), amount: z.number().finite().min(-1e9).max(1e9), cardId: z.string().max(64).optional(), forBills: z.boolean().default(false) }),
+  boxMoves: z.object({ id, boxId: z.string().max(64), date: day, amount: z.number().finite().min(-1e9).max(1e9) }),
 };
 
 export const settingsPatch = z.object({
@@ -84,6 +86,7 @@ export const dataSchema = z.object({
   // Backups antigos não têm esse campo.
   personPayments: z.array(schemas.personPayments).default([]),
   boxes: z.array(schemas.boxes).default([]),
+  boxMoves: z.array(schemas.boxMoves).default([]),
   repayments: z.array(schemas.repayments).default([]),
   history: z.array(z.object({ m: month, receitas: money, gastos: money, guardado: money.optional() })),
 });

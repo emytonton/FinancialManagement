@@ -136,7 +136,7 @@ export function Dashboard() {
                 <button key={b.id} type="button" className="b-boxchip" onClick={() => app.openForm("box", b)}>
                   <small>{b.name}</small>
                   <Money value={b.amount} />
-                  <small>{card ? "para a fatura " + card.name : "separado"}</small>
+                  <small>{card ? "para a fatura " + card.name : b.forBills ? "para as contas fixas" : "separado"}</small>
                 </button>
               );
             })}

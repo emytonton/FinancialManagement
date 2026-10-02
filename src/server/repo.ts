@@ -59,7 +59,7 @@ const tables = {
     fromDb: (r: any) => ({
       id: r.id, name: r.name, amount: num(r.amount), day: r.day, categoryId: r.categoryId, method: r.method,
       paid: Object.fromEntries((r.paidMonths as string[]).map(m => [m, true])),
-      kind: r.kind, amounts: r.amounts ?? {},
+      kind: r.kind, amounts: r.amounts ?? {}, fromBox: r.fromBox ?? {},
       ...(r.type ? { type: r.type } : {}), ...(r.start ? { start: r.start } : {}), ...(r.end ? { end: r.end } : {}),
     }),
   },
@@ -101,7 +101,12 @@ const tables = {
   boxes: {
     model: (db: Client) => db.box,
     toDb: (x: Input<"boxes">) => ({ ...x, cardId: x.cardId || null }),
-    fromDb: (r: any) => ({ id: r.id, name: r.name, icon: r.icon, amount: num(r.amount), ...(r.cardId ? { cardId: r.cardId } : {}) }),
+    fromDb: (r: any) => ({ id: r.id, name: r.name, icon: r.icon, amount: num(r.amount), forBills: r.forBills, ...(r.cardId ? { cardId: r.cardId } : {}) }),
+  },
+  boxMoves: {
+    model: (db: Client) => db.boxMove,
+    toDb: (x: Input<"boxMoves">) => ({ ...x, date: fromDay(x.date) }),
+    fromDb: (r: any) => ({ id: r.id, boxId: r.boxId, date: toDay(r.date), amount: num(r.amount) }),
   },
 } as const;
 

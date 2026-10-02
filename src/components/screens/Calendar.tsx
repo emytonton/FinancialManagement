@@ -5,6 +5,7 @@ import { debtsFor, dueInvoices, incomeName, type MonthBill } from "@/lib/finance
 import { Button, Card, EmptyState, IconButton, Money, Segmented, UpcomingItem } from "../ui";
 import { CalendarMonth, EVENT_TYPES } from "../finance-ui";
 import { useApp } from "../app/store";
+import { payBill, unpayBill } from "../app/bills";
 import { PageHead } from "./common";
 
 type Ev = { date: string; type: string; label: string; amount: number; status?: string };
@@ -26,11 +27,7 @@ export function Calendar() {
   c.contribs.forEach(x => { const g = data.goals.find(k => k.id === x.goalId); events.push({ date: x.date, type: "goal", label: "Aporte: " + (g ? g.name : "meta"), amount: x.amount }); });
   const dayEv = events.filter(e => dayOf(e.date) === sel);
   const setStatus = (b: MonthBill, st: string) => {
-    const orig = data.bills.find(x => x.id === b.id);
-    if (!orig) return;
-    const paid = { ...orig.paid };
-    if (st === "paga") paid[c.month] = true; else delete paid[c.month];
-    app.upsert("bills", { ...orig, paid });
+    if (st === "paga") payBill(app, b.id, c.month, b.amount); else unpayBill(app, b.id, c.month);
   };
   return <>
     <PageHead title="Calendário" sub="O que entra e sai nos próximos dias" />
